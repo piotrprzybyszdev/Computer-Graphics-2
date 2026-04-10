@@ -1,12 +1,12 @@
 include(${CMAKE_SOURCE_DIR}/cmake/Utils.cmake)
 
-# set(HEADER_FILES)
+set(HEADER_FILES ApplicationState.h Scene.h)
 
-set(SOURCE_FILES main.cpp)
+set(SOURCE_FILES main.cpp ApplicationState.cpp Scene.cpp)
 
-# set(SHADER_SOURCE_FILES)
+set(SHADER_SOURCE_FILES Shaders/robot.vert Shaders/color.frag)
 
-# create_directory_link(${CMAKE_CURRENT_SOURCE_DIR}/Shaders ${CMAKE_CURRENT_BINARY_DIR}/Shaders)
+create_directory_link(${CMAKE_CURRENT_SOURCE_DIR}/Shaders ${CMAKE_CURRENT_BINARY_DIR}/Shaders)
 create_directory_link(${CMAKE_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
 add_executable(robot ${HEADER_FILES} ${SOURCE_FILES} ${SHADER_SOURCE_FILES})
@@ -22,4 +22,4 @@ target_compile_options(robot PRIVATE
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
 )
 
-target_link_libraries(robot PRIVATE ref)
+target_link_libraries(robot PRIVATE ref glm)

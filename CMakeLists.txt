@@ -17,6 +17,7 @@ option(REF_BUILD_DEMOS OFF)
 
 add_subdirectory(robot)
 add_subdirectory(Rendering-Engine-Framework)
+add_subdirectory(vendor/glm)
 
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "robot")
