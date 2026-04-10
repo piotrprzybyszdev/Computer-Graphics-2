@@ -1,0 +1,3 @@
+[submodule "Rendering-Engine-Framework"]
+	path = Rendering-Engine-Framework
+	url = https://github.com/piotrprzybyszdev/Rendering-Engine-Framework.git
