@@ -1,6 +1,5 @@
 #include <imgui.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <Core/Core.h>
 
@@ -9,10 +8,12 @@
 
 #include "ApplicationState.h"
 
+#include <numeric>
+
 using namespace ref;
 using namespace ref::vulkan;
 
-SwapchainUserInterfaceState::SwapchainUserInterfaceState()
+SwapchainUserInterfaceState::SwapchainUserInterfaceState(Scene &scene) : m_Scene(scene)
 {
 }
 
@@ -30,8 +31,9 @@ void SwapchainUserInterfaceState::OnUpdate(float /* timeStep */)
     ImGui::End();
 }
 
-void SwapchainUserInterfaceState::OnKeyRelease(Key /* key */)
+void SwapchainUserInterfaceState::OnKeyRelease(Key key)
 {
+    m_Scene.OnKeyRelease(key);
 }
 
 struct CameraConstants
@@ -66,7 +68,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     };
 
     {
-        auto ptr = std::make_unique<SwapchainUserInterfaceState>();
+        auto ptr = std::make_unique<SwapchainUserInterfaceState>(m_Scene);
         m_UserInterfaceState = ptr.get();
         m_UserInterface = std::make_unique<UserInterface>(userInterfaceSpec, std::move(ptr));
     }
@@ -89,19 +91,19 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     builder.AddHostBuffer("Robot Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(6 * sizeof(glm::mat4x4)), true);
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
 
-    builder.AddHostBuffer("Cylinder Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetCylinderVertices().size_bytes()), false);
-    builder.AddHostBuffer("Cylinder Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetCylinderIndices().size_bytes()), false);
-    builder.AddHostBuffer("Cylinder Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(glm::mat4x4)), false);
+    builder.AddHostBuffer("Static Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetStaticVertices().size_bytes()), false);
+    builder.AddHostBuffer("Static Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetStaticIndices().size_bytes()), false);
+    builder.AddHostBuffer("Static Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetStaticTransforms().size_bytes()), false);
 
     ShaderId robotVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/robot.vert", "main", vk::ShaderStageFlagBits::eVertex));
-    ShaderId cylinderVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/cylinder.vert", "main", vk::ShaderStageFlagBits::eVertex));
+    ShaderId cylinderVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/static.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId fragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/color.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
     spec.ShaderLibrary->LoadShader(robotVertexShader);
     spec.ShaderLibrary->LoadShader(cylinderVertexShader);
     spec.ShaderLibrary->LoadShader(fragmentShader);
 
-    GraphicsPipelineId robotPipelineId, cylinderPipelineId;
+    GraphicsPipelineId robotPipelineId, staticMeshPipelineId;
     {
         GraphicsPipelineInfo pipelineInfo = {
             .Name = "Graphics Pipeline",
@@ -125,18 +127,20 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         robotPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
 
         pipelineInfo.Name = "Cylinder Pipeline";
-        pipelineInfo.BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(CylinderVertex)) };
-        pipelineInfo.VertexInputs = { { 0, offsetof(CylinderVertex, Position) }, { 0, offsetof(CylinderVertex, Normal) } };
+        pipelineInfo.BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(StaticVertex)) };
+        pipelineInfo.VertexInputs = { { 0, offsetof(StaticVertex, Position) }, { 0, offsetof(StaticVertex, Normal) } };
         pipelineInfo.VertexShaderId = cylinderVertexShader;
 
-        cylinderPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+        staticMeshPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
     }
 
     [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(robotPipelineId);
     assert(success == true);
-    success = spec.PipelineLibrary->CompilePipeline(cylinderPipelineId);
+    success = spec.PipelineLibrary->CompilePipeline(staticMeshPipelineId);
     assert(success == true);
 
+    m_MeshIndices.resize(std::max(m_Scene.GetRobotMeshes().size(), m_Scene.GetStaticMeshes().size()));
+    std::ranges::iota(m_MeshIndices, 0);
     {
         std::vector<IndexedGraphicsPassSpec::DrawSpec> draws;
         for (int i = 0; i < m_Scene.GetRobotMeshes().size(); i++)
@@ -184,16 +188,31 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     }
 
     {
+        std::vector<IndexedGraphicsPassSpec::DrawSpec> draws;
+        for (int i = 0; i < m_Scene.GetStaticMeshes().size(); i++)
+        {
+            const auto& mesh = m_Scene.GetStaticMeshes()[i];
+            draws.push_back({
+                .Command = {
+                    .IndexCount = mesh.IndexCount,
+                    .InstanceCount = 1,
+                    .FirstIndex = mesh.IndexOffset,
+                    .VertexOffset = mesh.VertexOffset,
+                    .FirstInstance = 0,
+                },
+                .PushConstantData = std::as_bytes(std::span(m_MeshIndices).subspan(i, 1)),
+            });
+        }
         IndexedGraphicsPassSpec passSpec = {
-            .Pipeline = cylinderPipelineId,
+            .Pipeline = staticMeshPipelineId,
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
-                { "Cylinder Transform Buffer", 1, true, false },
+                { "Static Transform Buffer", 1, true, false },
             },
             .VertexBuffers = {
-                .VertexBuffers = { { "Cylinder Vertex Buffer" } },
+                .VertexBuffers = { { "Static Vertex Buffer" } },
             },
-            .IndexBuffer = { "Cylinder Index Buffer", 0, vk::IndexType::eUint32 },
+            .IndexBuffer = { "Static Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
                     .ImageResource = "Image",
@@ -204,21 +223,11 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 .ImageResource = "Depth Stencil Image",
                 .LoadOp = vk::AttachmentLoadOp::eLoad,
             } },
-            .Draws = {
-                {
-                    .Command = {
-                        .IndexCount = static_cast<uint32_t>(m_Scene.GetCylinderIndices().size()),
-                        .InstanceCount = 1,
-                        .FirstIndex = 0,
-                        .VertexOffset = 0,
-                        .FirstInstance = 0,
-                    },
-                }
-            },
+            .Draws = std::move(draws),
         };
-        builder.AddIndexedGraphicsPass("Cylinder Pass", passSpec);
+        builder.AddIndexedGraphicsPass("Static Mesh Pass", passSpec);
     }
-
+    
     {
         CustomGraphicsPassSpec passSpec = {
             .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
@@ -264,13 +273,9 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     uploadBuffer("Robot Vertex Position Index Buffer", std::as_bytes(m_Scene.GetRobotVertexIndices()));
     uploadBuffer("Robot Vertex Normal Buffer", std::as_bytes(m_Scene.GetRobotVertexNormals()));
     uploadBuffer("Robot Index Buffer", std::as_bytes(m_Scene.GetRobotTriangles()));
-    uploadBuffer("Cylinder Vertex Buffer", std::as_bytes(m_Scene.GetCylinderVertices()));
-    uploadBuffer("Cylinder Index Buffer", std::as_bytes(m_Scene.GetCylinderIndices()));
-
-    {
-        glm::mat4x4 cylinderTransform = glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.5f, -1.0f, -3.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f));
-        uploadBuffer("Cylinder Transform Buffer", std::as_bytes(std::span(&cylinderTransform, 1)));
-    }
+    uploadBuffer("Static Vertex Buffer", std::as_bytes(m_Scene.GetStaticVertices()));
+    uploadBuffer("Static Index Buffer", std::as_bytes(m_Scene.GetStaticIndices()));
+    uploadBuffer("Static Transform Buffer", std::as_bytes(m_Scene.GetStaticTransforms()));
 }
 
 RobotApplicationState::~RobotApplicationState()
@@ -290,7 +295,7 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
     m_Renderer->OnResize(swapchain);
 
     const vk::Extent2D extent = swapchain->GetExtent();
-    m_Width = extent.width; m_Height = extent.height;
+    m_Scene.OnResize(extent.width, extent.height);
 
     m_FrameGraph->ModifyImage("Image").Info.setExtent(vk::Extent3D(extent, 1));
     m_FrameGraph->UpdateImage("Image");
@@ -309,7 +314,7 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
     };
 
     resizeGraphicsPass("Robot Pass");
-    resizeGraphicsPass("Cylinder Pass");
+    resizeGraphicsPass("Static Mesh Pass");
 
     std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
 
@@ -324,23 +329,19 @@ void RobotApplicationState::OnUpdate(float timeStep)
     m_UserInterface->OnUpdate(timeStep);
     m_Renderer->OnUpdate(timeStep);
 
-    {
-        // TODO: inverse kinematics
-        std::array<glm::mat4x4, 6> RobotMeshTransforms;
-        for (int i = 0; i < 6; i++)
-            RobotMeshTransforms[i] = glm::identity<glm::mat4x4>();
+    m_Scene.OnUpdate(timeStep);
 
+    {
+        auto transforms = m_Scene.GetRobotTransforms();
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Robot Transform Buffer");
-        m_ResourceAllocator->UploadToBuffer(bufferId, RobotMeshTransforms.data(), std::span(RobotMeshTransforms).size_bytes());
+        m_ResourceAllocator->UploadToBuffer(bufferId, transforms.data(), transforms.size_bytes());
     }
 
     {
-        // TODO: camera controls
         CameraConstants camera = {
-            .Projection = glm::perspectiveFov(45.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.1f, 1000.0f),
-            .View = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+            .Projection = m_Scene.GetCameraProjection(),
+            .View = m_Scene.GetCameraView(),
         };
-
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
     }

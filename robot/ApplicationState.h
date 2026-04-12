@@ -1,15 +1,16 @@
-#include <glm/glm.hpp>
-
 #include <Core/UserInterface.h>
 
 #include <Vulkan/ApplicationState.h>
+
+#include <memory>
+#include <vector>
 
 #include "Scene.h"
 
 class SwapchainUserInterfaceState final : public ref::UserInterfaceState
 {
 public:
-    SwapchainUserInterfaceState();
+    SwapchainUserInterfaceState(Scene &scene);
     ~SwapchainUserInterfaceState() override = default;
 
     void OnInit() override;
@@ -17,6 +18,9 @@ public:
 
     void OnUpdate(float timeStep) override;
     void OnKeyRelease(ref::Key key) override;
+
+private:
+    Scene &m_Scene;
 };
 
 class RobotApplicationState final : public ref::vulkan::ApplicationState
@@ -42,7 +46,6 @@ private:
     std::unique_ptr<ref::vulkan::ResourceAllocator> m_ResourceAllocator;
 
     Scene m_Scene;
-    uint32_t m_Width = 0, m_Height = 0;
-    std::array<uint32_t, 6> m_MeshIndices = { 0,1,2,3,4,5 };
+    std::vector<uint32_t> m_MeshIndices;
 };
 

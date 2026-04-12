@@ -18,11 +18,11 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
 };
 
 layout(set = 0, binding = 1) readonly buffer PositionBuffer {
-    vec4[] s_Positions;
+    vec4 s_Positions[];
 };
 
 layout(set = 0, binding = 2) readonly buffer MeshBuffer {
-    RobotMesh[] s_Meshes;
+    RobotMesh s_Meshes[];
 };
 
 layout(set = 0, binding = 3) uniform TransformBuffer {
