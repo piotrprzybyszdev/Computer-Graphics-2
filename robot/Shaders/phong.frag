@@ -1,0 +1,36 @@
+#version 460
+
+struct Light
+{
+    vec4 Position;
+};
+
+layout(set = 0, binding = 0) uniform CameraBuffer {
+    mat4x4 u_CameraProjection;
+    mat4x4 u_CameraView;
+    vec4 u_CameraOrigin;
+};
+
+layout(set = 0, binding = 4) readonly buffer LightBuffer {
+    Light s_Lights[];
+};
+
+layout (location = 0) in vec4 v_Position;
+layout (location = 1) in vec4 v_Normal;
+
+layout (location = 0) out vec4 o_FragColor;
+
+void main()
+{
+    const vec3 N = normalize(v_Normal.xyz);
+    const vec3 L = normalize(s_Lights[0].Position.xyz - v_Position.xyz);
+    const vec3 V = normalize(u_CameraOrigin.xyz - v_Position.xyz);
+    const vec3 R = normalize(reflect(-L, N));
+    
+    const float ka = 0.1f, kd = 0.5f, ks = 0.5f, m = 100.0f;
+
+    const float diffuse = max(dot(N, L), 0.0f);
+    const float specular = pow(max(dot(R, V), 0.0f), m);
+
+    o_FragColor = vec4(vec3(ka + kd * diffuse + ks * specular), 1.0f);
+}

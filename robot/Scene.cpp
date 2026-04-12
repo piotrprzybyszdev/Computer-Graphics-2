@@ -17,11 +17,14 @@ Scene::Scene()
 
     m_StaticMeshes.Meshes.push_back(CreateCylinderMesh(1.0f, 10.0f, 10, 3));
     
-    glm::mat4x4 cylinderTransform = glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.5f, -1.0f, -3.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f));
-    m_StaticMeshes.Transforms.push_back(cylinderTransform);
+    m_StaticMeshes.Transforms.push_back(
+        glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.5f, -1.0f, -3.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f))
+    );
 
     m_StaticMeshes.Meshes.push_back(CreateUnitCubeMesh());
     m_StaticMeshes.Transforms.push_back(glm::scale(glm::mat4x4(1.0f), glm::vec3(3.0f, 2.0f, 3.0f)));
+
+    m_Lights.push_back(Light(glm::vec4(2.0f, 1.0f, 1.0f, 1.0f)));
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -32,7 +35,8 @@ void Scene::OnResize(uint32_t width, uint32_t height)
 void Scene::OnUpdate(float /* timeStep */)
 {
     // TODO: camera controls
-    m_Camera.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    m_Camera.Origin = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+    m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
 
     // TODO: inverse kinematics
     for (int i = 0; i < 6; i++)
@@ -52,6 +56,11 @@ const glm::mat4x4& Scene::GetCameraProjection() const
 const glm::mat4x4& Scene::GetCameraView() const
 {
     return m_Camera.View;
+}
+
+const glm::vec4& Scene::GetCameraOrigin() const
+{
+    return m_Camera.Origin;
 }
 
 std::span<const glm::vec4> Scene::GetRobotPositions() const
@@ -107,6 +116,11 @@ std::span<const StaticMesh> Scene::GetStaticMeshes() const
 std::span<const glm::mat4x4> Scene::GetStaticTransforms() const
 {
     return m_StaticMeshes.Transforms;
+}
+
+std::span<const Light> Scene::GetLights() const
+{
+    return m_Lights;
 }
 
 RobotMesh Scene::LoadRobotMesh(const std::filesystem::path& path)

@@ -31,6 +31,11 @@ struct StaticMesh
     uint32_t IndexCount;
 };
 
+struct Light
+{
+    glm::vec4 Position;
+};
+
 class Scene
 {
 public:
@@ -43,6 +48,7 @@ public:
 
     const glm::mat4x4& GetCameraProjection() const;
     const glm::mat4x4& GetCameraView() const;
+    const glm::vec4& GetCameraOrigin() const;
 
     std::span<const glm::vec4> GetRobotPositions() const;
     std::span<const uint32_t> GetRobotVertexIndices() const;
@@ -59,11 +65,14 @@ public:
     std::span<const StaticMesh> GetStaticMeshes() const;
     std::span<const glm::mat4x4> GetStaticTransforms() const;
 
+    std::span<const Light> GetLights() const;
+
 private:
     struct Camera
     {
         glm::mat4x4 View;
         glm::mat4x4 Projection;
+        glm::vec4 Origin;
     } m_Camera;
 
     struct Robot
@@ -86,6 +95,8 @@ private:
 
         std::vector<StaticMesh> Meshes;
     } m_StaticMeshes;
+
+    std::vector<Light> m_Lights;
 
 private:
     RobotMesh LoadRobotMesh(const std::filesystem::path& path);

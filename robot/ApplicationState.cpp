@@ -40,6 +40,7 @@ struct CameraConstants
 {
     glm::mat4x4 Projection;
     glm::mat4x4 View;
+    glm::vec4 Origin;
 };
 
 RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
@@ -95,9 +96,11 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     builder.AddHostBuffer("Static Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetStaticIndices().size_bytes()), false);
     builder.AddHostBuffer("Static Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetStaticTransforms().size_bytes()), false);
 
+    builder.AddHostBuffer("Light Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetLights().size_bytes()), false);
+
     ShaderId robotVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/robot.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId cylinderVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/static.vert", "main", vk::ShaderStageFlagBits::eVertex));
-    ShaderId fragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/color.frag", "main", vk::ShaderStageFlagBits::eFragment));
+    ShaderId fragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/phong.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
     spec.ShaderLibrary->LoadShader(robotVertexShader);
     spec.ShaderLibrary->LoadShader(cylinderVertexShader);
@@ -165,6 +168,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 { "Robot Vertex Position Buffer", 1, true, false },
                 { "Robot Mesh Buffer", 2, true, false },
                 { "Robot Transform Buffer", 3, true, false },
+                { "Light Buffer", 4, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Robot Vertex Position Index Buffer" }, { "Robot Vertex Normal Buffer" } },
@@ -208,6 +212,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
                 { "Static Transform Buffer", 1, true, false },
+                { "Light Buffer", 4, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Static Vertex Buffer" } },
@@ -276,6 +281,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     uploadBuffer("Static Vertex Buffer", std::as_bytes(m_Scene.GetStaticVertices()));
     uploadBuffer("Static Index Buffer", std::as_bytes(m_Scene.GetStaticIndices()));
     uploadBuffer("Static Transform Buffer", std::as_bytes(m_Scene.GetStaticTransforms()));
+    uploadBuffer("Light Buffer", std::as_bytes(m_Scene.GetLights()));
 }
 
 RobotApplicationState::~RobotApplicationState()
@@ -341,6 +347,7 @@ void RobotApplicationState::OnUpdate(float timeStep)
         CameraConstants camera = {
             .Projection = m_Scene.GetCameraProjection(),
             .View = m_Scene.GetCameraView(),
+            .Origin = m_Scene.GetCameraOrigin(),
         };
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
