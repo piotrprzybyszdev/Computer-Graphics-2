@@ -43,5 +43,5 @@ void main()
     const uint positionOffset = s_Meshes[pc_MeshIndex].PositionOffset;
     const mat4x4 transform = u_Transforms[pc_MeshIndex];
     gl_Position = u_CameraProjection * u_CameraView * transform * vec4(s_Positions[positionOffset + v_PositionIndex].xyz, 1.0f);
-    o_Normal = v_Normal;
+    o_Normal = normalize(transform * vec4(v_Normal.xyz, 0.0f));
 }

@@ -15,6 +15,12 @@ struct RobotMesh
     uint32_t EdgeCount;
 };
 
+struct CylinderVertex
+{
+    glm::vec4 Position;
+    glm::vec4 Normal;
+};
+
 class Scene
 {
 public:
@@ -28,6 +34,9 @@ public:
 
     std::span<const RobotMesh> GetRobotMeshes() const;
 
+    std::span<const CylinderVertex> GetCylinderVertices() const;
+    std::span<const uint32_t> GetCylinderIndices() const;
+
 private:
     struct Robot
     {
@@ -40,6 +49,13 @@ private:
         std::vector<RobotMesh> Meshes;
     } m_Robot;
 
+    struct Cylinder
+    {
+        std::vector<CylinderVertex> Vertices;
+        std::vector<uint32_t> Indices;
+    } m_Cylinder;
+
 private:
     RobotMesh LoadRobotMesh(const std::filesystem::path& path);
+    Cylinder CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);
 };

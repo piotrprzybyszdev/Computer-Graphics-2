@@ -89,17 +89,23 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     builder.AddHostBuffer("Robot Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(6 * sizeof(glm::mat4x4)), true);
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
 
-    ShaderId vertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/robot.vert", "main", vk::ShaderStageFlagBits::eVertex));
+    builder.AddHostBuffer("Cylinder Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetCylinderVertices().size_bytes()), false);
+    builder.AddHostBuffer("Cylinder Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetCylinderIndices().size_bytes()), false);
+    builder.AddHostBuffer("Cylinder Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(glm::mat4x4)), false);
+
+    ShaderId robotVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/robot.vert", "main", vk::ShaderStageFlagBits::eVertex));
+    ShaderId cylinderVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/cylinder.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId fragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/color.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
-    spec.ShaderLibrary->LoadShader(vertexShader);
+    spec.ShaderLibrary->LoadShader(robotVertexShader);
+    spec.ShaderLibrary->LoadShader(cylinderVertexShader);
     spec.ShaderLibrary->LoadShader(fragmentShader);
 
-    GraphicsPipelineId graphicsPipelineId;
+    GraphicsPipelineId robotPipelineId, cylinderPipelineId;
     {
         GraphicsPipelineInfo pipelineInfo = {
             .Name = "Graphics Pipeline",
-            .VertexShaderId = vertexShader,
+            .VertexShaderId = robotVertexShader,
             .FragmentShaderId = fragmentShader,
             .BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(uint32_t)), vk::VertexInputBindingDescription(1, sizeof(glm::vec4)) },
             .VertexInputs = { { 0, 0 }, { 1, 0 } },
@@ -116,10 +122,19 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         pipelineInfo.DepthStencilState.setDepthWriteEnable(vk::True);
         pipelineInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eLess);
 
-        graphicsPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+        robotPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo.Name = "Cylinder Pipeline";
+        pipelineInfo.BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(CylinderVertex)) };
+        pipelineInfo.VertexInputs = { { 0, offsetof(CylinderVertex, Position) }, { 0, offsetof(CylinderVertex, Normal) } };
+        pipelineInfo.VertexShaderId = cylinderVertexShader;
+
+        cylinderPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
     }
 
-    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(graphicsPipelineId);
+    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(robotPipelineId);
+    assert(success == true);
+    success = spec.PipelineLibrary->CompilePipeline(cylinderPipelineId);
     assert(success == true);
 
     {
@@ -140,7 +155,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         }
 
         IndexedGraphicsPassSpec passSpec = {
-            .Pipeline = graphicsPipelineId,
+            .Pipeline = robotPipelineId,
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
                 { "Robot Vertex Position Buffer", 1, true, false },
@@ -165,7 +180,43 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
             } },
             .Draws = std::move(draws),
         };
-        builder.AddIndexedGraphicsPass("Main Pass", passSpec);
+        builder.AddIndexedGraphicsPass("Robot Pass", passSpec);
+    }
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = cylinderPipelineId,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Cylinder Transform Buffer", 1, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Cylinder Vertex Buffer" } },
+            },
+            .IndexBuffer = { "Cylinder Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                    .LoadOp = vk::AttachmentLoadOp::eLoad,
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+                .LoadOp = vk::AttachmentLoadOp::eLoad,
+            } },
+            .Draws = {
+                {
+                    .Command = {
+                        .IndexCount = static_cast<uint32_t>(m_Scene.GetCylinderIndices().size()),
+                        .InstanceCount = 1,
+                        .FirstIndex = 0,
+                        .VertexOffset = 0,
+                        .FirstInstance = 0,
+                    },
+                }
+            },
+        };
+        builder.AddIndexedGraphicsPass("Cylinder Pass", passSpec);
     }
 
     {
@@ -213,6 +264,13 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     uploadBuffer("Robot Vertex Position Index Buffer", std::as_bytes(m_Scene.GetRobotVertexIndices()));
     uploadBuffer("Robot Vertex Normal Buffer", std::as_bytes(m_Scene.GetRobotVertexNormals()));
     uploadBuffer("Robot Index Buffer", std::as_bytes(m_Scene.GetRobotTriangles()));
+    uploadBuffer("Cylinder Vertex Buffer", std::as_bytes(m_Scene.GetCylinderVertices()));
+    uploadBuffer("Cylinder Index Buffer", std::as_bytes(m_Scene.GetCylinderIndices()));
+
+    {
+        glm::mat4x4 cylinderTransform = glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.5f, -1.0f, -3.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f));
+        uploadBuffer("Cylinder Transform Buffer", std::as_bytes(std::span(&cylinderTransform, 1)));
+    }
 }
 
 RobotApplicationState::~RobotApplicationState()
@@ -240,13 +298,18 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
     m_FrameGraph->ModifyImage("Depth Stencil Image").Info.setExtent(vk::Extent3D(extent, 1));
     m_FrameGraph->UpdateImage("Depth Stencil Image");
 
-    m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Main Pass").GetScissors() = {
-    vk::Rect2D(vk::Offset2D(0, 0), extent)
+    auto resizeGraphicsPass = [&](const std::string &name) {
+        m_FrameGraph->GetIndexedGraphicsPassDynamicConfig(name).GetScissors() = {
+            vk::Rect2D(vk::Offset2D(0, 0), extent)
+        };
+        m_FrameGraph->GetIndexedGraphicsPassDynamicConfig(name).GetViewports() = {
+            vk::Viewport(0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1)
+        };
+        m_FrameGraph->GetIndexedGraphicsPassDynamicConfig(name).GetRenderArea().extent = extent;
     };
-    m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Main Pass").GetViewports() = {
-        vk::Viewport(0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1)
-    };
-    m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Main Pass").GetRenderArea().extent = extent;
+
+    resizeGraphicsPass("Robot Pass");
+    resizeGraphicsPass("Cylinder Pass");
 
     std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
 
@@ -275,7 +338,7 @@ void RobotApplicationState::OnUpdate(float timeStep)
         // TODO: camera controls
         CameraConstants camera = {
             .Projection = glm::perspectiveFov(45.0f, static_cast<float>(m_Width), static_cast<float>(m_Height), 0.1f, 1000.0f),
-            .View = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+            .View = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
         };
 
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
