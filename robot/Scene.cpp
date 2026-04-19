@@ -24,7 +24,7 @@ Scene::Scene()
     m_StaticMeshes.Meshes.push_back(CreateUnitCubeMesh());
     m_StaticMeshes.Transforms.push_back(glm::scale(glm::mat4x4(1.0f), glm::vec3(3.0f, 2.0f, 3.0f)));
 
-    m_Lights.push_back(Light(glm::vec4(2.0f, 1.0f, 1.0f, 1.0f)));
+    m_Lights.push_back(Light(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)));
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
