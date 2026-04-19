@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <span>
 
-struct RobotMesh
+struct StaticMesh
 {
     uint32_t PositionOffset;
     uint32_t PositionCount;
@@ -15,20 +15,6 @@ struct RobotMesh
     uint32_t TriangleCount;
     uint32_t EdgeOffset;
     uint32_t EdgeCount;
-};
-
-struct StaticVertex
-{
-    glm::vec4 Position;
-    glm::vec4 Normal;
-};
-
-struct StaticMesh
-{
-    uint32_t VertexOffset;
-    uint32_t IndexOffset;
-    uint32_t VertexCount;
-    uint32_t IndexCount;
 };
 
 struct Light
@@ -50,20 +36,15 @@ public:
     const glm::mat4x4& GetCameraView() const;
     const glm::vec4& GetCameraOrigin() const;
 
-    std::span<const glm::vec4> GetRobotPositions() const;
-    std::span<const uint32_t> GetRobotVertexIndices() const;
-    std::span<const glm::vec4> GetRobotVertexNormals() const;
-    std::span<const glm::uvec3> GetRobotTriangles() const;
-    std::span<const glm::uvec4> GetRobotEdges() const;
+    std::span<const glm::vec4> GetPositions() const;
+    std::span<const uint32_t> GetVertexIndices() const;
+    std::span<const glm::vec4> GetVertexNormals() const;
+    std::span<const glm::uvec3> GetTriangles() const;
+    std::span<const glm::uvec4> GetEdges() const;
 
-    std::span<const glm::mat4x4> GetRobotTransforms() const;
-    std::span<const RobotMesh> GetRobotMeshes() const;
-
-    std::span<const StaticVertex> GetStaticVertices() const;
-    std::span<const uint32_t> GetStaticIndices() const;
-
-    std::span<const StaticMesh> GetStaticMeshes() const;
-    std::span<const glm::mat4x4> GetStaticTransforms() const;
+    std::span<const StaticMesh> GetMeshes() const;
+    std::span<const StaticMesh> GetRobotMeshes() const;
+    std::span<const glm::mat4x4> GetTransforms() const;
 
     std::span<const Light> GetLights() const;
 
@@ -75,7 +56,7 @@ private:
         glm::vec4 Origin;
     } m_Camera;
 
-    struct Robot
+    struct StaticMeshes
     {
         std::vector<glm::vec4> Positions;
         std::vector<uint32_t> VertexIndices;
@@ -84,22 +65,13 @@ private:
         std::vector<glm::uvec4> Edges;
         std::vector<glm::mat4x4> Transforms;
 
-        std::vector<RobotMesh> Meshes;
-    } m_Robot;
-
-    struct StaticMeshes
-    {
-        std::vector<StaticVertex> Vertices;
-        std::vector<uint32_t> Indices;
-        std::vector<glm::mat4x4> Transforms;
-
         std::vector<StaticMesh> Meshes;
     } m_StaticMeshes;
 
     std::vector<Light> m_Lights;
 
 private:
-    RobotMesh LoadRobotMesh(const std::filesystem::path& path);
+    StaticMesh LoadRobotMesh(const std::filesystem::path& path);
     StaticMesh CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);
     StaticMesh CreateUnitCubeMesh();
 };

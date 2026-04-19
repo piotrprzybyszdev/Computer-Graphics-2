@@ -66,11 +66,11 @@ uvec3 getTrianglePositionIndices(uint triangleIdx)
     );
 }
 
-void getTrianglePositions(out vec3 positions[3], in uvec3 positionIndices)
+void getTrianglePositions(out vec3 positions[3], in uvec3 positionIndices, in mat4x4 transform)
 {
-    positions[0] = s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.x].xyz;
-    positions[1] = s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.y].xyz;
-    positions[2] = s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.z].xyz;
+    positions[0] = (transform * vec4(s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.x].xyz, 1.0f)).xyz;
+    positions[1] = (transform * vec4(s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.y].xyz, 1.0f)).xyz;
+    positions[2] = (transform * vec4(s_Positions[s_Meshes[pc_MeshIndex].PositionOffset + positionIndices.z].xyz, 1.0f)).xyz;
 }
 
 vec3 getNormal(in vec3 trianglePositions[3])
@@ -94,67 +94,52 @@ bool isFacingLight(in vec3 trianglePositions[3])
     return isFacing(trianglePositions, lightDir);
 }
 
-void emitLightCap(in vec3 trianglePositions[3], mat4x4 MVP)
+void emitLightCap(in vec3 trianglePositions[3], in mat4x4 VP)
 {
     const float epsilon = 0.0001f;
 
-    // render the front cap
     vec3 lightDir = (normalize(trianglePositions[0] - s_Lights[0].Position.xyz));
-    gl_Position = MVP * vec4((trianglePositions[0] + lightDir * epsilon), 1.0);
+    gl_Position = VP * vec4((trianglePositions[0] + lightDir * epsilon), 1.0);
     EmitVertex();
 
     lightDir = (normalize(trianglePositions[1] - s_Lights[0].Position.xyz));
-    gl_Position = MVP * vec4((trianglePositions[1] + lightDir * epsilon), 1.0);
+    gl_Position = VP * vec4((trianglePositions[1] + lightDir * epsilon), 1.0);
     EmitVertex();
 
     lightDir = normalize(trianglePositions[2] - s_Lights[0].Position.xyz);
-    gl_Position = MVP * vec4((trianglePositions[2] + lightDir * epsilon), 1.0);
+    gl_Position = VP * vec4((trianglePositions[2] + lightDir * epsilon), 1.0);
     EmitVertex();
     EndPrimitive();
 
-    // render the back cap
     lightDir = (normalize(trianglePositions[2] - s_Lights[0].Position.xyz));
-    gl_Position = MVP * vec4((trianglePositions[2] + lightDir * 1.0f), 1.0);
+    gl_Position = VP * vec4((trianglePositions[2] + lightDir * 10.0f), 1.0);
     EmitVertex();
 
     lightDir = (normalize(trianglePositions[1] - s_Lights[0].Position.xyz));
-    gl_Position = MVP * vec4((trianglePositions[1] + lightDir * 1.0f), 1.0);
+    gl_Position = VP * vec4((trianglePositions[1] + lightDir * 10.0f), 1.0);
     EmitVertex();
 
     lightDir = normalize(trianglePositions[0] - s_Lights[0].Position.xyz);
-    gl_Position = MVP * vec4((trianglePositions[0] + lightDir * 1.0f), 1.0);
+    gl_Position = VP * vec4((trianglePositions[0] + lightDir * 10.0f), 1.0);
     EmitVertex();
     EndPrimitive();
-
-    // lightDir = trianglePositions[0] - s_Lights[0].Position.xyz;
-    // gl_Position = MVP * vec4(lightDir, 0.0);
-    // EmitVertex();
-    // 
-    // lightDir = trianglePositions[2] - s_Lights[0].Position.xyz;
-    // gl_Position = MVP * vec4(lightDir, 0.0);
-    // EmitVertex();
-    // 
-    // lightDir = trianglePositions[1] - s_Lights[0].Position.xyz;
-    // gl_Position = MVP * vec4(lightDir, 0.0);
-    // EmitVertex();
-    // EndPrimitive();
 }
 
 void main()
 {
     const mat4x4 transform = u_Transforms[pc_MeshIndex];
-    const mat4x4 MVP = u_CameraProjection * u_CameraView * transform;
+    const mat4x4 VP = u_CameraProjection * u_CameraView;
 
     const uvec3 positionIndices1 = getTrianglePositionIndices(v_Edge[0].z);
     const uvec3 positionIndices2 = getTrianglePositionIndices(v_Edge[0].w);
     
     vec3 trianglePositions1[3], trianglePositions2[3];
-    getTrianglePositions(trianglePositions1, positionIndices1);
-    getTrianglePositions(trianglePositions2, positionIndices2);
+    getTrianglePositions(trianglePositions1, positionIndices1, transform);
+    getTrianglePositions(trianglePositions2, positionIndices2, transform);
 
     const uint positionOffset = s_Meshes[pc_MeshIndex].PositionOffset;
-    vec3 edgePosition1 = s_Positions[positionOffset + v_Edge[0].x].xyz;
-    vec3 edgePosition2 = s_Positions[positionOffset + v_Edge[0].y].xyz;
+    const vec3 edgePosition1 = (transform * vec4(s_Positions[positionOffset + v_Edge[0].x].xyz, 1.0f)).xyz;
+    const vec3 edgePosition2 = (transform * vec4(s_Positions[positionOffset + v_Edge[0].y].xyz, 1.0f)).xyz;
 
     if ((isFacingLight(trianglePositions1) && !isFacingLight(trianglePositions2)) ||
         (!isFacingLight(trianglePositions1) && isFacingLight(trianglePositions2)))
@@ -172,40 +157,34 @@ void main()
         {
             const float epsilon = 0.0001f;
             vec3 lightDir = normalize(edgePosition1 - s_Lights[0].Position.xyz);
-            gl_Position = MVP * vec4((edgePosition1 + lightDir * epsilon), 1.0);
+            gl_Position = VP * vec4((edgePosition1 + lightDir * epsilon), 1.0);
             EmitVertex();
 
-            // Vertex #2: the starting vertex projected to infinity
-            gl_Position = MVP * vec4((edgePosition1 + lightDir * 1.0f), 1.0);
+            gl_Position = VP * vec4((edgePosition1 + lightDir * 10.0f), 1.0);
             EmitVertex();
 
-            // Vertex #3: the ending vertex (just a tiny bit below the original edge)
             lightDir = normalize(edgePosition2 - s_Lights[0].Position.xyz);
-            gl_Position = MVP * vec4((edgePosition2 + lightDir * epsilon), 1.0);
+            gl_Position = VP * vec4((edgePosition2 + lightDir * epsilon), 1.0);
             EmitVertex();
 
-            // Vertex #4: the ending vertex projected to infinity
-            gl_Position = MVP * vec4((edgePosition2 + lightDir * 1.0f), 1.0);
+            gl_Position = VP * vec4((edgePosition2 + lightDir * 10.0f), 1.0);
             EmitVertex();
         }
         else
         {
             const float epsilon = 0.0001f;
             vec3 lightDir = normalize(edgePosition2 - s_Lights[0].Position.xyz);
-            gl_Position = MVP * vec4((edgePosition2 + lightDir * epsilon), 1.0);
+            gl_Position = VP * vec4((edgePosition2 + lightDir * epsilon), 1.0);
             EmitVertex();
 
-            // Vertex #2: the starting vertex projected to infinity
-            gl_Position = MVP * vec4((edgePosition2 + lightDir * 1.0f), 1.0);
+            gl_Position = VP * vec4((edgePosition2 + lightDir * 10.0f), 1.0);
             EmitVertex();
 
-            // Vertex #3: the ending vertex (just a tiny bit below the original edge)
             lightDir = normalize(edgePosition1 - s_Lights[0].Position.xyz);
-            gl_Position = MVP * vec4((edgePosition1 + lightDir * epsilon), 1.0);
+            gl_Position = VP * vec4((edgePosition1 + lightDir * epsilon), 1.0);
             EmitVertex();
 
-            // Vertex #4: the ending vertex projected to infinity
-            gl_Position = MVP * vec4((edgePosition1 + lightDir * 1.0f), 1.0);
+            gl_Position = VP * vec4((edgePosition1 + lightDir * 10.0f), 1.0);
             EmitVertex();
         }
 
@@ -216,13 +195,13 @@ void main()
     {
         const uint maxIdx1 = max(max(positionIndices1.x, positionIndices1.y), positionIndices1.z);
         if (maxIdx1 != v_Edge[0].x && maxIdx1 != v_Edge[0].y)
-            emitLightCap(trianglePositions1, MVP);
+            emitLightCap(trianglePositions1, VP);
     }
     
     if (isFacingLight(trianglePositions2))
     {
         const uint maxIdx2 = max(max(positionIndices2.x, positionIndices2.y), positionIndices2.z);
         if (maxIdx2 != v_Edge[0].x && maxIdx2 != v_Edge[0].y)
-            emitLightCap(trianglePositions2, MVP);
+            emitLightCap(trianglePositions2, VP);
     }
 }
