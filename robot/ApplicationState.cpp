@@ -93,27 +93,75 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     builder.AddHostBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetTransforms().size_bytes()), true);
     
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
+    builder.AddHostBuffer("Mirror Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
     builder.AddHostBuffer("Light Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetLights().size_bytes()), false);
 
-    ShaderId robotVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/mesh.vert", "main", vk::ShaderStageFlagBits::eVertex));
-    ShaderId phongFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/phong.frag", "main", vk::ShaderStageFlagBits::eFragment));
+    ShaderId meshVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/mesh.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowGeometryShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.geom", "main", vk::ShaderStageFlagBits::eGeometry));
-    ShaderId shadowFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.frag", "main", vk::ShaderStageFlagBits::eFragment));
+    ShaderId phongFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/phong.frag", "main", vk::ShaderStageFlagBits::eFragment));
+    ShaderId emptyFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/empty.frag", "main", vk::ShaderStageFlagBits::eFragment));
     ShaderId ambientFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/ambient.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
-    spec.ShaderLibrary->LoadShader(robotVertexShader);
+    spec.ShaderLibrary->LoadShader(meshVertexShader);
     spec.ShaderLibrary->LoadShader(ambientFragmentShader);
     spec.ShaderLibrary->LoadShader(phongFragmentShader);
     spec.ShaderLibrary->LoadShader(shadowVertexShader);
     spec.ShaderLibrary->LoadShader(shadowGeometryShader);
-    spec.ShaderLibrary->LoadShader(shadowFragmentShader);
+    spec.ShaderLibrary->LoadShader(emptyFragmentShader);
+
+    GraphicsPipelineId mirrorStencilPipelineId, reflectionPipelineId, mirrorPipelineId;
+    {
+        GraphicsPipelineInfo pipelineInfo = {
+            .Name = "Mirror Stencil Pipeline",
+            .VertexShaderId = meshVertexShader,
+            .FragmentShaderId = emptyFragmentShader,
+            .BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(uint32_t)), vk::VertexInputBindingDescription(1, sizeof(glm::vec4)) },
+            .VertexInputs = { { 0, 0 }, { 1, 0 } },
+            .ColorAttachmentFormats = { vk::Format::eR8G8B8A8Unorm },
+            .DepthAttachmentFormat = vk::Format::eD24UnormS8Uint,
+            .StencilAttachmentFormat = vk::Format::eD24UnormS8Uint,
+        };
+
+        pipelineInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
+        pipelineInfo.RasterizationState.setLineWidth(1.0f);
+        pipelineInfo.DepthStencilState.setStencilTestEnable(vk::True);
+        pipelineInfo.DepthStencilState.setBack(vk::StencilOpState().setWriteMask(0xff).setCompareOp(vk::CompareOp::eAlways).setPassOp(vk::StencilOp::eReplace).setReference(1));
+        pipelineInfo.DepthStencilState.setFront(vk::StencilOpState().setWriteMask(0xff).setCompareOp(vk::CompareOp::eAlways).setPassOp(vk::StencilOp::eReplace).setReference(1));
+        pipelineInfo.AttachmentBlendStates.emplace_back().setColorWriteMask(vk::FlagTraits<vk::ColorComponentFlagBits>::allFlags);
+        mirrorStencilPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo.Name = "Reflection Pipeline";
+        pipelineInfo.FragmentShaderId = phongFragmentShader;
+        pipelineInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eFront);
+        pipelineInfo.DepthStencilState.setDepthTestEnable(vk::True);
+        pipelineInfo.DepthStencilState.setDepthWriteEnable(vk::True);
+        pipelineInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eLess);
+        pipelineInfo.DepthStencilState.setBack(vk::StencilOpState().setCompareMask(0xff).setCompareOp(vk::CompareOp::eEqual).setReference(1));
+        pipelineInfo.DepthStencilState.setFront(vk::StencilOpState().setCompareMask(0xff).setCompareOp(vk::CompareOp::eEqual).setReference(1));
+        reflectionPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo.Name = "Mirror Pipeline";
+        pipelineInfo.FragmentShaderId = ambientFragmentShader;
+        pipelineInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eNone);
+        pipelineInfo.DepthStencilState.setStencilTestEnable(vk::False);
+        pipelineInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eAlways);
+        pipelineInfo.AttachmentBlendStates.back().setColorWriteMask(vk::ColorComponentFlags());
+        mirrorPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+    }
+
+    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(mirrorStencilPipelineId);
+    assert(success == true);
+    success = spec.PipelineLibrary->CompilePipeline(reflectionPipelineId);
+    assert(success == true);
+    success = spec.PipelineLibrary->CompilePipeline(mirrorPipelineId);
+    assert(success == true);
 
     GraphicsPipelineId lightingPipelineId, shadowPipelineId, ambientPipelineId;
     {
         GraphicsPipelineInfo pipelineInfo = {
             .Name = "Ambient Pipeline",
-            .VertexShaderId = robotVertexShader,
+            .VertexShaderId = meshVertexShader,
             .FragmentShaderId = ambientFragmentShader,
             .BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(uint32_t)), vk::VertexInputBindingDescription(1, sizeof(glm::vec4)) },
             .VertexInputs = { { 0, 0 }, { 1, 0 } },            
@@ -148,14 +196,14 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         
         pipelineInfo.VertexShaderId = shadowVertexShader;
         pipelineInfo.GeometryShaderId = shadowGeometryShader;
-        pipelineInfo.FragmentShaderId = shadowFragmentShader;
+        pipelineInfo.FragmentShaderId = emptyFragmentShader;
         pipelineInfo.BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(glm::uvec4)) };
         pipelineInfo.VertexInputs = { { 0, 0 } };
         
         shadowPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
     }
 
-    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(lightingPipelineId);
+    success = spec.PipelineLibrary->CompilePipeline(lightingPipelineId);
     assert(success == true);
     success = spec.PipelineLibrary->CompilePipeline(shadowPipelineId);
     assert(success == true);
@@ -164,9 +212,10 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 
     m_MeshIndices.resize(m_Scene.GetMeshes().size());
     std::ranges::iota(m_MeshIndices, 0);
+    m_MirrorMeshIndex = m_Scene.GetMirrorMeshIndex();
 
-    std::vector<IndexedGraphicsPassSpec::DrawSpec> meshDraws = std::ranges::iota_view(0ull, m_Scene.GetMeshes().size()) | std::views::transform([this](size_t index) {
-        const auto& mesh = m_Scene.GetMeshes()[index];
+    std::vector<IndexedGraphicsPassSpec::DrawSpec> meshDraws = std::ranges::iota_view(0ull, m_Scene.GetStaticMeshes().size()) | std::views::transform([this](size_t index) {
+        const auto& mesh = m_Scene.GetStaticMeshes()[index];
         return  IndexedGraphicsPassSpec::DrawSpec{
             .Command = {
                 .IndexCount = mesh.TriangleCount * 3,
@@ -179,9 +228,20 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         };
     }) | std::ranges::to<std::vector>();
 
+    IndexedGraphicsPassSpec::DrawSpec mirrorDraw = {
+        .Command = {
+            .IndexCount = m_Scene.GetMirrorMesh().TriangleCount * 3,
+            .InstanceCount = 1,
+            .FirstIndex = m_Scene.GetMirrorMesh().TriangleOffset * 3,
+            .VertexOffset = m_Scene.GetMirrorMesh().VertexOffset,
+            .FirstInstance = 0,
+        },
+        .PushConstantData = std::as_bytes(std::span(&m_MirrorMeshIndex, 1)),
+    };
+
     {
         IndexedGraphicsPassSpec passSpec = {
-            .Pipeline = ambientPipelineId,
+            .Pipeline = mirrorStencilPipelineId,
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
                 { "Vertex Position Buffer", 1, true, false },
@@ -203,6 +263,96 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 .ImageResource = "Depth Stencil Image",
                 .LoadOp = vk::AttachmentLoadOp::eClear,
                 .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
+            } },
+            .StencilAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+                .LoadOp = vk::AttachmentLoadOp::eClear,
+                .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
+            } },
+            .Draws = { mirrorDraw },
+        };
+        builder.AddIndexedGraphicsPass("Mirror Stencil Pass", passSpec);
+    }
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = reflectionPipelineId,
+            .BufferBindings = {
+                { "Mirror Camera Uniform Buffer", 0, true, false },
+                { "Vertex Position Buffer", 1, true, false },
+                { "Mesh Buffer", 2, true, false },
+                { "Transform Buffer", 3, true, false },
+                { "Light Buffer", 4, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Vertex Position Index Buffer" }, { "Vertex Normal Buffer" } },
+            },
+            .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .StencilAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .Draws = meshDraws,
+        };
+        builder.AddIndexedGraphicsPass("Reflection Pass", passSpec);
+    }
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = mirrorPipelineId,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Vertex Position Buffer", 1, true, false },
+                { "Mesh Buffer", 2, true, false },
+                { "Transform Buffer", 3, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Vertex Position Index Buffer" }, { "Vertex Normal Buffer" } },
+            },
+            .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .StencilAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .Draws = { mirrorDraw },
+        };
+        builder.AddIndexedGraphicsPass("Mirror Pass", passSpec);
+    }
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = ambientPipelineId,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Vertex Position Buffer", 1, true, false },
+                { "Mesh Buffer", 2, true, false },
+                { "Transform Buffer", 3, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Vertex Position Index Buffer" }, { "Vertex Normal Buffer" } },
+            },
+            .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
             } },
             .StencilAttachment = { {
                 .ImageResource = "Depth Stencil Image",
@@ -370,6 +520,9 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Lighting Pass"));
     resizeGraphicsPass(m_FrameGraph->GetGraphicsPassDynamicConfig("Shadow Pass"));
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Ambient Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Mirror Stencil Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Mirror Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Reflection Pass"));
 
     std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
 
@@ -399,6 +552,16 @@ void RobotApplicationState::OnUpdate(float timeStep)
             .Origin = m_Scene.GetCameraOrigin(),
         };
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
+        m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
+    }
+
+    {
+        CameraConstants camera = {
+            .Projection = m_Scene.GetCameraProjection(),
+            .View = m_Scene.GetMirrorViewMatrix(),
+            .Origin = m_Scene.GetMirrorCameraOrigin(),
+        };
+        auto bufferId = m_FrameGraph->GetCurrentBuffer("Mirror Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
     }
 }

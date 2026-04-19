@@ -47,5 +47,6 @@ private:
 
     Scene m_Scene;
     std::vector<uint32_t> m_MeshIndices;
+    uint32_t m_MirrorMeshIndex;
 };
 

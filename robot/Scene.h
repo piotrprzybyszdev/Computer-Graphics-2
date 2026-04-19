@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <span>
 
-struct StaticMesh
+struct Mesh
 {
     uint32_t PositionOffset;
     uint32_t PositionCount;
@@ -42,9 +42,16 @@ public:
     std::span<const glm::uvec3> GetTriangles() const;
     std::span<const glm::uvec4> GetEdges() const;
 
-    std::span<const StaticMesh> GetMeshes() const;
-    std::span<const StaticMesh> GetRobotMeshes() const;
+    std::span<const Mesh> GetMeshes() const;
+    std::span<const Mesh> GetRobotMeshes() const;
+    std::span<const Mesh> GetStaticMeshes() const;
+
     std::span<const glm::mat4x4> GetTransforms() const;
+
+    const Mesh& GetMirrorMesh() const;
+    uint32_t GetMirrorMeshIndex() const;
+    glm::mat4x4 GetMirrorViewMatrix() const;
+    glm::vec4 GetMirrorCameraOrigin() const;
 
     std::span<const Light> GetLights() const;
 
@@ -56,7 +63,7 @@ private:
         glm::vec4 Origin;
     } m_Camera;
 
-    struct StaticMeshes
+    struct Meshes
     {
         std::vector<glm::vec4> Positions;
         std::vector<uint32_t> VertexIndices;
@@ -65,13 +72,14 @@ private:
         std::vector<glm::uvec4> Edges;
         std::vector<glm::mat4x4> Transforms;
 
-        std::vector<StaticMesh> Meshes;
-    } m_StaticMeshes;
+        std::vector<Mesh> Meshes;
+    } m_Meshes;
 
     std::vector<Light> m_Lights;
 
 private:
-    StaticMesh LoadRobotMesh(const std::filesystem::path& path);
-    StaticMesh CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);
-    StaticMesh CreateUnitCubeMesh();
+    Mesh LoadRobotMesh(const std::filesystem::path& path);
+    Mesh CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);
+    Mesh CreateUnitCubeMesh();
+    Mesh CreateUnitSquareMesh();
 };
