@@ -17,9 +17,23 @@ struct Mesh
     uint32_t EdgeCount;
 };
 
+struct Texture
+{
+    uint32_t Width;
+    uint32_t Height;
+    std::vector<std::byte> Content;
+};
+
 struct Light
 {
     glm::vec4 Position;
+};
+
+struct Particle
+{
+    glm::mat4x4 Transform;
+    float Alpha;
+    glm::vec3 pad0;
 };
 
 class Scene
@@ -55,6 +69,9 @@ public:
 
     std::span<const Light> GetLights() const;
 
+    const Texture& GetSparkTexture() const;
+    std::span<const Particle> GetParticles() const;
+
 private:
     struct Camera
     {
@@ -77,9 +94,14 @@ private:
 
     std::vector<Light> m_Lights;
 
+    Texture m_SparkTexture;
+    std::vector<Particle> m_Particles;
+
 private:
     Mesh LoadRobotMesh(const std::filesystem::path& path);
     Mesh CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);
     Mesh CreateUnitCubeMesh();
     Mesh CreateUnitSquareMesh();
+
+    Texture LoadTexture(const std::filesystem::path& path);
 };

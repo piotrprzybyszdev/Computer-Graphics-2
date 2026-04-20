@@ -78,37 +78,80 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 
     builder.AddDeviceImage(
         "Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1280, 720, 1), 1, 1)
-        .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), true
+        .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), true, false
     );
     builder.AddDeviceImage(
         "Depth Stencil Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eD24UnormS8Uint, vk::Extent3D(1280, 720, 1), 1, 1)
-        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), true
+        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), true, false
     );
-    builder.AddHostBuffer("Mesh Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetMeshes().size_bytes()), false);
-    builder.AddHostBuffer("Vertex Position Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetPositions().size_bytes()), false);
-    builder.AddHostBuffer("Vertex Position Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetVertexIndices().size_bytes()), false);
-    builder.AddHostBuffer("Vertex Normal Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertexNormals().size_bytes()), false);
-    builder.AddHostBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTriangles().size_bytes()), false);
-    builder.AddHostBuffer("Edge Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetEdges().size_bytes()), false);
-    builder.AddHostBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetTransforms().size_bytes()), true);
+    builder.AddDeviceBuffer("Mesh Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetMeshes().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Vertex Position Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetPositions().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Vertex Position Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetVertexIndices().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Vertex Normal Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertexNormals().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTriangles().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Edge Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetEdges().size_bytes()), false, true);
+    builder.AddHostBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetTransforms().size_bytes()), true, true);
+    builder.AddHostBuffer("Particle Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetParticles().size_bytes()), true, true);
     
-    builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
-    builder.AddHostBuffer("Mirror Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true);
-    builder.AddHostBuffer("Light Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetLights().size_bytes()), false);
+    builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true, true);
+    builder.AddHostBuffer("Mirror Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true, true);
+    builder.AddDeviceBuffer("Light Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetLights().size_bytes()), false, true);
+
+    const Texture& sparkTexture = m_Scene.GetSparkTexture();
+    builder.AddDeviceImage(
+        "Spark Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(sparkTexture.Width, sparkTexture.Height, 1), 1, 1)
+        .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), false, true
+    );
 
     ShaderId meshVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/mesh.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.vert", "main", vk::ShaderStageFlagBits::eVertex));
+    ShaderId particleVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/particle.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowGeometryShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.geom", "main", vk::ShaderStageFlagBits::eGeometry));
     ShaderId phongFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/phong.frag", "main", vk::ShaderStageFlagBits::eFragment));
     ShaderId emptyFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/empty.frag", "main", vk::ShaderStageFlagBits::eFragment));
     ShaderId ambientFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/ambient.frag", "main", vk::ShaderStageFlagBits::eFragment));
+    ShaderId particleFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/particle.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
     spec.ShaderLibrary->LoadShader(meshVertexShader);
+    spec.ShaderLibrary->LoadShader(shadowVertexShader);
+    spec.ShaderLibrary->LoadShader(particleVertexShader);
     spec.ShaderLibrary->LoadShader(ambientFragmentShader);
     spec.ShaderLibrary->LoadShader(phongFragmentShader);
-    spec.ShaderLibrary->LoadShader(shadowVertexShader);
     spec.ShaderLibrary->LoadShader(shadowGeometryShader);
     spec.ShaderLibrary->LoadShader(emptyFragmentShader);
+    spec.ShaderLibrary->LoadShader(particleFragmentShader);
+
+    GraphicsPipelineId particlePipelineId, particleReflectionPipelineId;
+    {
+        GraphicsPipelineInfo pipelineInfo = {
+            .Name = "Particle Pipeline",
+            .VertexShaderId = particleVertexShader,
+            .FragmentShaderId = particleFragmentShader,
+            .ColorAttachmentFormats = { vk::Format::eR8G8B8A8Unorm },
+            .DepthAttachmentFormat = vk::Format::eD24UnormS8Uint,
+            .StencilAttachmentFormat = vk::Format::eD24UnormS8Uint,
+        };
+
+        pipelineInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleStrip);
+        pipelineInfo.RasterizationState.setLineWidth(1.0f);
+        pipelineInfo.DepthStencilState.setDepthTestEnable(vk::True);
+        pipelineInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eLess);
+        pipelineInfo.AttachmentBlendStates.emplace_back().setColorWriteMask(vk::FlagTraits<vk::ColorComponentFlagBits>::allFlags).setBlendEnable(vk::True)
+            .setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha).setDstColorBlendFactor(vk::BlendFactor::eOne)
+            .setSrcAlphaBlendFactor(vk::BlendFactor::eSrcAlpha).setDstAlphaBlendFactor(vk::BlendFactor::eOne);
+        particlePipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo.Name = "Particle Reflection Pipeline";
+        pipelineInfo.DepthStencilState.setStencilTestEnable(vk::True);
+        pipelineInfo.DepthStencilState.setBack(vk::StencilOpState().setCompareMask(0xff).setCompareOp(vk::CompareOp::eEqual).setReference(1));
+        pipelineInfo.DepthStencilState.setFront(vk::StencilOpState().setCompareMask(0xff).setCompareOp(vk::CompareOp::eEqual).setReference(1));
+        particleReflectionPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+    }
+
+    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(particlePipelineId);
+    assert(success == true);
+    success = spec.PipelineLibrary->CompilePipeline(particleReflectionPipelineId);
+    assert(success == true);
 
     GraphicsPipelineId mirrorStencilPipelineId, reflectionPipelineId, mirrorPipelineId;
     {
@@ -150,7 +193,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         mirrorPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
     }
 
-    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipeline(mirrorStencilPipelineId);
+    success = spec.PipelineLibrary->CompilePipeline(mirrorStencilPipelineId);
     assert(success == true);
     success = spec.PipelineLibrary->CompilePipeline(reflectionPipelineId);
     assert(success == true);
@@ -213,6 +256,8 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     m_MeshIndices.resize(m_Scene.GetMeshes().size());
     std::ranges::iota(m_MeshIndices, 0);
     m_MirrorMeshIndex = m_Scene.GetMirrorMeshIndex();
+
+    m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
 
     std::vector<IndexedGraphicsPassSpec::DrawSpec> meshDraws = std::ranges::iota_view(0ull, m_Scene.GetStaticMeshes().size()) | std::views::transform([this](size_t index) {
         const auto& mesh = m_Scene.GetStaticMeshes()[index];
@@ -302,6 +347,41 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
             .Draws = meshDraws,
         };
         builder.AddIndexedGraphicsPass("Reflection Pass", passSpec);
+    }
+
+    {
+        GraphicsPassSpec passSpec = {
+            .Pipeline = particleReflectionPipelineId,
+            .BufferBindings = {
+                { "Mirror Camera Uniform Buffer", 0, true, false },
+                { "Particle Buffer", 1, true, false },
+            },
+            .ImageBindings = {
+                { "Spark Texture", 2, m_TextureSampler, true, false},
+            },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .StencilAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .Draws = {
+                {
+                    .Command = {
+                        .VertexCount = 4,
+                        .InstanceCount = static_cast<uint32_t>(m_Scene.GetParticles().size()),
+                        .FirstVertex = 0,
+                        .FirstInstance = 0,
+                    },
+                }
+            },
+        };
+        builder.AddGraphicsPass("Particle Reflection Pass", passSpec);
     }
 
     {
@@ -439,6 +519,41 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     }
 
     {
+        GraphicsPassSpec passSpec = {
+            .Pipeline = particlePipelineId,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Particle Buffer", 1, true, false },
+            },
+            .ImageBindings = {
+                { "Spark Texture", 2, m_TextureSampler, true, false},
+            },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .StencilAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .Draws = {
+                {
+                    .Command = {
+                        .VertexCount = 4,
+                        .InstanceCount = static_cast<uint32_t>(m_Scene.GetParticles().size()),
+                        .FirstVertex = 0,
+                        .FirstInstance = 0,
+                    },
+                }
+            },
+        };
+        builder.AddGraphicsPass("Particle Pass", passSpec);
+    }
+
+    {
         CustomGraphicsPassSpec passSpec = {
             .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
             .ColorAttachments = {
@@ -468,13 +583,18 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         .LogicalDevice = spec.LogicalDevice,
         .MainQueue = m_MainQueue,
         .FrameGraph = m_FrameGraph.get(),
+        .ResourceAllocator = m_ResourceAllocator.get(),
     };
 
     m_Renderer = std::make_unique<Renderer>(rendererSpec);
 
     auto uploadBuffer = [&](const std::string &name, std::span<const std::byte> data) {
-        auto bufferId = m_FrameGraph->GetCurrentBuffer(name);
-        m_ResourceAllocator->UploadToBuffer(bufferId, data.data(), data.size());
+        assert(m_FrameGraph->GetBuffer(name).size() == 1);
+        auto bufferId = m_FrameGraph->GetBuffer(name).front();
+        if (m_ResourceAllocator->GetBufferResource(bufferId).IsDevice)
+            m_Renderer->UploadWithStaging(bufferId, data);
+        else
+            m_ResourceAllocator->UploadToBuffer(bufferId, data.data(), data.size());
     };
 
     uploadBuffer("Mesh Buffer", std::as_bytes(m_Scene.GetMeshes()));
@@ -484,6 +604,11 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetTriangles()));
     uploadBuffer("Edge Buffer", std::as_bytes(m_Scene.GetEdges()));
     uploadBuffer("Light Buffer", std::as_bytes(m_Scene.GetLights()));
+
+    m_Renderer->UploadWithStaging(
+        m_FrameGraph->GetImage("Spark Texture").front().first, sparkTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
+    );
 }
 
 RobotApplicationState::~RobotApplicationState()
@@ -523,6 +648,8 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Mirror Stencil Pass"));
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Mirror Pass"));
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Reflection Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetGraphicsPassDynamicConfig("Particle Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetGraphicsPassDynamicConfig("Particle Reflection Pass"));
 
     std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
 
@@ -542,6 +669,12 @@ void RobotApplicationState::OnUpdate(float timeStep)
     {
         auto transforms = m_Scene.GetTransforms();
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Transform Buffer");
+        m_ResourceAllocator->UploadToBuffer(bufferId, transforms.data(), transforms.size_bytes());
+    }
+
+    {
+        auto transforms = m_Scene.GetParticles();
+        auto bufferId = m_FrameGraph->GetCurrentBuffer("Particle Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, transforms.data(), transforms.size_bytes());
     }
 

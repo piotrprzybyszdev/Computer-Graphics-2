@@ -19,7 +19,6 @@ int main()
 
     {
         vulkan::Application application = builder.CreateApplication("REF");
-        vulkan::ErrorApplicationState::AddToApplication(application);
         application.AddAndCreateState<RobotApplicationState>("Robot State");
         application.Run("Robot State");
     }

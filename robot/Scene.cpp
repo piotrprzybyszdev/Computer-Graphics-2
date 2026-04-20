@@ -1,5 +1,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include <cassert>
 #include <format>
 #include <fstream>
@@ -29,6 +32,11 @@ Scene::Scene()
     m_Meshes.Transforms.push_back(glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(2.0f, -0.3f, -1.5f)), glm::radians(-40.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f)));
 
     m_Lights.push_back(Light(glm::vec4(0.5f, 1.0f, 0.0f, 1.0f)));
+
+    m_SparkTexture = LoadTexture("assets/spark.png");
+
+    const size_t particleCount = 10;
+    m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -45,6 +53,13 @@ void Scene::OnUpdate(float /* timeStep */)
     // TODO: inverse kinematics
     for (int i = 0; i < 6; i++)
         m_Meshes.Transforms[i] = glm::mat4x4(1.0f);
+
+    // TODO: particle simulation
+    for (int i = 0; i < m_Particles.size(); i++)
+        m_Particles[i] = {
+            .Transform = glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(360.0f * (i / static_cast<float>(m_Particles.size()))), glm::vec3(0.0f, 0.0f, 1.0f)),
+            .Alpha = 0.25f,
+        };
 }
 
 void Scene::OnKeyRelease(ref::Key /* key */)
@@ -139,6 +154,16 @@ glm::vec4 Scene::GetMirrorCameraOrigin() const
 std::span<const Light> Scene::GetLights() const
 {
     return m_Lights;
+}
+
+const Texture& Scene::GetSparkTexture() const
+{
+    return m_SparkTexture;
+}
+
+std::span<const Particle> Scene::GetParticles() const
+{
+    return m_Particles;
 }
 
 Mesh Scene::LoadRobotMesh(const std::filesystem::path& path)
@@ -384,4 +409,19 @@ Mesh Scene::CreateUnitSquareMesh()
     mesh.EdgeCount = static_cast<uint32_t>(m_Meshes.Edges.size()) - mesh.EdgeOffset;
 
     return mesh;
+}
+
+Texture Scene::LoadTexture(const std::filesystem::path& path)
+{
+    int x, y, channels;
+    stbi_uc *data = stbi_load(path.string().c_str(), &x, &y, &channels, STBI_rgb_alpha);
+    const size_t size = 4ull * x * y;
+
+    Texture texture = { static_cast<uint32_t>(x), static_cast<uint32_t>(y) };
+    std::byte* content = reinterpret_cast<std::byte*>(data);
+    texture.Content.assign(content, content + size);
+
+    stbi_image_free(data);
+
+    return texture;
 }

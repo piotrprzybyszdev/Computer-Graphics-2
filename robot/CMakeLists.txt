@@ -4,7 +4,7 @@ set(HEADER_FILES ApplicationState.h Scene.h)
 
 set(SOURCE_FILES main.cpp ApplicationState.cpp Scene.cpp)
 
-set(SHADER_SOURCE_FILES Shaders/mesh.vert Shaders/shadow.vert Shaders/shadow.geom Shaders/phong.frag Shaders/empty.frag Shaders/ambient.frag)
+set(SHADER_SOURCE_FILES Shaders/mesh.vert Shaders/shadow.vert Shaders/particle.vert Shaders/shadow.geom Shaders/phong.frag Shaders/empty.frag Shaders/ambient.frag Shaders/particle.frag)
 
 create_directory_link(${CMAKE_CURRENT_SOURCE_DIR}/Shaders ${CMAKE_CURRENT_BINARY_DIR}/Shaders)
 create_directory_link(${CMAKE_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
@@ -16,6 +16,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX "Source Files" FILES ${SOUR
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Shaders PREFIX "Shaders" FILES ${SHADER_SOURCE_FILES})
 
 target_include_directories(robot PRIVATE ${CMAKE_SOURCE_DIR}/robot)
+target_include_directories(robot PRIVATE ${CMAKE_SOURCE_DIR}/vendor/stb)
 
 target_compile_options(robot PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX /MP>
