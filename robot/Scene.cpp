@@ -6,6 +6,7 @@
 #include <cassert>
 #include <format>
 #include <fstream>
+#include <iostream>
 #include <numbers>
 #include <ranges>
 #include <vector>
@@ -62,9 +63,22 @@ void Scene::OnUpdate(float /* timeStep */)
         };
 }
 
-void Scene::OnKeyRelease(ref::Key /* key */)
+void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */)
 {
     // TODO: camera controls
+    std::cout << "Key event: " << static_cast<uint32_t>(key) << " " << static_cast<uint32_t>(action) << std::endl;
+}
+
+void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods /* mods */)
+{
+    // TODO: camera controls
+    std::cout << "Mouse button event: " << static_cast<uint32_t>(button) << " " << static_cast<uint32_t>(action) << std::endl;
+}
+
+void Scene::OnCursorMoveEvent(double xpos, double ypos)
+{
+    // TODO: camera controls
+    std::cout << "Mouse move event: " << xpos << " " << ypos << std::endl;
 }
 
 const glm::mat4x4& Scene::GetCameraProjection() const

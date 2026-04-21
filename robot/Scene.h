@@ -44,7 +44,9 @@ public:
     void OnResize(uint32_t width, uint32_t height);
     void OnUpdate(float timeStep);
 
-    void OnKeyRelease(ref::Key key);
+    void OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods mods);
+    void OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods);
+    void OnCursorMoveEvent(double xpos, double ypos);
 
     const glm::mat4x4& GetCameraProjection() const;
     const glm::mat4x4& GetCameraView() const;

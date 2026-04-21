@@ -13,27 +13,29 @@
 using namespace ref;
 using namespace ref::vulkan;
 
-SwapchainUserInterfaceState::SwapchainUserInterfaceState(Scene &scene) : m_Scene(scene)
+RobotUserInterfaceState::RobotUserInterfaceState(Scene& scene) : m_Scene(scene)
 {
 }
 
-void SwapchainUserInterfaceState::OnInit()
-{
-}
-
-void SwapchainUserInterfaceState::OnShutdown()
-{
-}
-
-void SwapchainUserInterfaceState::OnUpdate(float /* timeStep */)
+void RobotUserInterfaceState::OnUpdate(float /* timeStep */)
 {
     ImGui::Begin("Bonjur");
     ImGui::End();
 }
 
-void SwapchainUserInterfaceState::OnKeyRelease(Key key)
+void RobotUserInterfaceState::OnKeyEvent(Key key, KeyAction action, Mods mods)
 {
-    m_Scene.OnKeyRelease(key);
+    m_Scene.OnKeyEvent(key, action, mods);
+}
+
+void RobotUserInterfaceState::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
+{
+    m_Scene.OnMouseButtonEvent(button, action, mods);
+}
+
+void RobotUserInterfaceState::OnCursorMoveEvent(double xpos, double ypos)
+{
+    m_Scene.OnCursorMoveEvent(xpos, ypos);
 }
 
 struct CameraConstants
@@ -68,11 +70,8 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         .ImageFormat = vk::Format::eR8G8B8A8Unorm,
     };
 
-    {
-        auto ptr = std::make_unique<SwapchainUserInterfaceState>(m_Scene);
-        m_UserInterfaceState = ptr.get();
-        m_UserInterface = std::make_unique<UserInterface>(userInterfaceSpec, std::move(ptr));
-    }
+    m_UserInterfaceState = std::make_unique<RobotUserInterfaceState>(m_Scene);
+    m_UserInterface = std::make_unique<UserInterface>(userInterfaceSpec, *m_UserInterfaceState);
 
     FrameGraphBuilder builder;
 
@@ -612,14 +611,6 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 }
 
 RobotApplicationState::~RobotApplicationState()
-{
-}
-
-void RobotApplicationState::OnEnter(ApplicationState* /* previous */)
-{
-}
-
-void RobotApplicationState::OnExit(ApplicationState* /* next */)
 {
 }
 
