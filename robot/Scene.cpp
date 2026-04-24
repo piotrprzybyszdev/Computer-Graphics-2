@@ -38,6 +38,9 @@ Scene::Scene()
 
     const size_t particleCount = 10;
     m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
+
+    m_CameraPosition = glm::vec3(0.0f, 0.0f, 2.0f);
+    m_CameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -45,11 +48,26 @@ void Scene::OnResize(uint32_t width, uint32_t height)
     m_Camera.Projection = glm::perspectiveFov(45.0f, static_cast<float>(width), static_cast<float>(height), 0.1f, 1000.0f);
 }
 
-void Scene::OnUpdate(float /* timeStep */)
+void Scene::OnUpdate(float timeStep)
 {
-    // TODO: camera controls
-    m_Camera.Origin = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-    m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+    const float speed = 0.002f;
+
+	const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+	glm::vec3 cameraRight = glm::normalize(glm::cross(m_CameraForward, glm::vec3(0.0f, 1.0f, 0.0f)));
+
+    if (m_PressedKeys.contains(ref::Key::W)) m_CameraPosition += timeStep * speed * m_CameraForward;
+    if (m_PressedKeys.contains(ref::Key::S)) m_CameraPosition -= timeStep * speed * m_CameraForward;
+    if (m_PressedKeys.contains(ref::Key::A)) m_CameraPosition += timeStep * speed * cameraRight;
+    if (m_PressedKeys.contains(ref::Key::D)) m_CameraPosition -= timeStep * speed * cameraRight;
+    if (m_PressedKeys.contains(ref::Key::Q)) m_CameraPosition += timeStep * speed * up;
+    if (m_PressedKeys.contains(ref::Key::E)) m_CameraPosition -= timeStep * speed * up;
+
+	m_Camera.Origin = glm::vec4(m_CameraPosition, 1.0f);
+    m_Camera.View = glm::lookAt(
+        m_CameraPosition,
+        m_CameraPosition + m_CameraForward,
+        up
+    );
 
     // TODO: inverse kinematics
     for (int i = 0; i < 6; i++)
@@ -67,18 +85,59 @@ void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */
 {
     // TODO: camera controls
     std::cout << "Key event: " << static_cast<uint32_t>(key) << " " << static_cast<uint32_t>(action) << std::endl;
+
+	if (action == ref::KeyAction::Press || action == ref::KeyAction::Repeat)
+        m_PressedKeys.insert(key);
+    else if (action == ref::KeyAction::Release)
+        m_PressedKeys.erase(key);
 }
 
 void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods /* mods */)
 {
     // TODO: camera controls
     std::cout << "Mouse button event: " << static_cast<uint32_t>(button) << " " << static_cast<uint32_t>(action) << std::endl;
+
+    if (button == ref::Button::Right)
+    {
+        m_IsRightMouseDown = action == ref::ButtonAction::Press;
+        m_HasLastMouse = false;
+    }
 }
 
 void Scene::OnCursorMoveEvent(double xpos, double ypos)
 {
     // TODO: camera controls
     std::cout << "Mouse move event: " << xpos << " " << ypos << std::endl;
+
+    if (!m_IsRightMouseDown)
+        return;
+
+    if (!m_HasLastMouse)
+    {
+        m_LastMouseX = xpos;
+        m_LastMouseY = ypos;
+        m_HasLastMouse = true;
+        return;
+    }
+
+    const float dx = static_cast<float>(xpos - m_LastMouseX);
+    const float dy = static_cast<float>(ypos - m_LastMouseY);
+
+    m_LastMouseX = xpos;
+    m_LastMouseY = ypos;
+
+    m_Yaw -= dx * m_MouseSensitivity;
+    m_Pitch -= dy * m_MouseSensitivity;
+    m_Pitch = std::clamp(m_Pitch, -89.0f, 89.0f);
+
+    const float yawRad = glm::radians(m_Yaw);
+    const float pitchRad = glm::radians(m_Pitch);
+
+    m_CameraForward = glm::vec3(
+        std::cos(yawRad) * std::cos(pitchRad),
+        std::sin(pitchRad),
+        std::sin(yawRad) * std::cos(pitchRad)
+    );
 }
 
 const glm::mat4x4& Scene::GetCameraProjection() const

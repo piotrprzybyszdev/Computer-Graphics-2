@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <span>
+#include <unordered_set>
 
 struct Mesh
 {
@@ -98,6 +99,20 @@ private:
 
     Texture m_SparkTexture;
     std::vector<Particle> m_Particles;
+
+	std::unordered_set<ref::Key> m_PressedKeys;
+    
+    double m_LastMouseX = 0.0;
+    double m_LastMouseY = 0.0;
+    bool m_HasLastMouse = false;
+    bool m_IsRightMouseDown = false;
+
+    float m_Yaw = -90.0f;
+    float m_Pitch = 0.0f;
+    float m_MouseSensitivity = 0.12f;
+
+	glm::vec3 m_CameraPosition;
+    glm::vec3 m_CameraForward;
 
 private:
     Mesh LoadRobotMesh(const std::filesystem::path& path);
