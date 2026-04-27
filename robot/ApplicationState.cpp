@@ -97,12 +97,18 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     builder.AddDeviceBuffer("Light Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetLights().size_bytes()), false, true);
 
     const Texture& sparkTexture = m_Scene.GetSparkTexture();
+    const Texture& mirrorTexture = m_Scene.GetMirrorTexture();
     builder.AddDeviceImage(
         "Spark Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(sparkTexture.Width, sparkTexture.Height, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), false, true
     );
+    builder.AddDeviceImage(
+        "Mirror Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(mirrorTexture.Width, mirrorTexture.Height, 1), 1, 1)
+        .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), false, true
+    );
 
     ShaderId meshVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/mesh.vert", "main", vk::ShaderStageFlagBits::eVertex));
+    ShaderId mirrorVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/mirror.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId particleVertexShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/particle.vert", "main", vk::ShaderStageFlagBits::eVertex));
     ShaderId shadowGeometryShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/shadow.geom", "main", vk::ShaderStageFlagBits::eGeometry));
@@ -112,6 +118,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
     ShaderId particleFragmentShader = spec.ShaderLibrary->AddShader(ShaderInfo("Shaders/particle.frag", "main", vk::ShaderStageFlagBits::eFragment));
 
     spec.ShaderLibrary->LoadShader(meshVertexShader);
+    spec.ShaderLibrary->LoadShader(mirrorVertexShader);
     spec.ShaderLibrary->LoadShader(shadowVertexShader);
     spec.ShaderLibrary->LoadShader(particleVertexShader);
     spec.ShaderLibrary->LoadShader(ambientFragmentShader);
@@ -185,11 +192,14 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
         reflectionPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
 
         pipelineInfo.Name = "Mirror Pipeline";
-        pipelineInfo.FragmentShaderId = ambientFragmentShader;
+        pipelineInfo.VertexShaderId = mirrorVertexShader;
+        pipelineInfo.FragmentShaderId = particleFragmentShader;
         pipelineInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eNone);
         pipelineInfo.DepthStencilState.setStencilTestEnable(vk::False);
         pipelineInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eAlways);
-        pipelineInfo.AttachmentBlendStates.back().setColorWriteMask(vk::ColorComponentFlags());
+        pipelineInfo.AttachmentBlendStates.back().setColorWriteMask(vk::FlagTraits<vk::ColorComponentFlagBits>::allFlags).setBlendEnable(vk::True)
+            .setSrcColorBlendFactor(vk::BlendFactor::eSrcAlpha).setDstColorBlendFactor(vk::BlendFactor::eOne)
+            .setSrcAlphaBlendFactor(vk::BlendFactor::eSrcAlpha).setDstAlphaBlendFactor(vk::BlendFactor::eOne);
         mirrorPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
     }
 
@@ -360,7 +370,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 { "Particle Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Spark Texture", 2, m_TextureSampler, true, false},
+                { "Spark Texture", 4, m_TextureSampler, true, false},
             },
             .ColorAttachments = {
                 {
@@ -395,6 +405,9 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 { "Vertex Position Buffer", 1, true, false },
                 { "Mesh Buffer", 2, true, false },
                 { "Transform Buffer", 3, true, false },
+            },
+            .ImageBindings = {
+                { "Mirror Texture", 4, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Position Index Buffer" }, { "Vertex Normal Buffer" } },
@@ -529,7 +542,7 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
                 { "Particle Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Spark Texture", 2, m_TextureSampler, true, false},
+                { "Spark Texture", 4, m_TextureSampler, true, false},
             },
             .ColorAttachments = {
                 {
@@ -610,6 +623,10 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 
     m_Renderer->UploadWithStaging(
         m_FrameGraph->GetImage("Spark Texture").front().first, sparkTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
+    );
+    m_Renderer->UploadWithStaging(
+        m_FrameGraph->GetImage("Mirror Texture").front().first, mirrorTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
     );
 }

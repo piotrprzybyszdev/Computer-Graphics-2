@@ -4,7 +4,7 @@ set(HEADER_FILES ApplicationState.h Scene.h)
 
 set(SOURCE_FILES main.cpp ApplicationState.cpp Scene.cpp)
 
-set(SHADER_SOURCE_FILES Shaders/mesh.vert Shaders/shadow.vert Shaders/particle.vert Shaders/shadow.geom Shaders/phong.frag Shaders/empty.frag Shaders/ambient.frag Shaders/particle.frag)
+set(SHADER_SOURCE_FILES Shaders/mesh.vert Shaders/mirror.vert Shaders/shadow.vert Shaders/particle.vert Shaders/shadow.geom Shaders/phong.frag Shaders/empty.frag Shaders/ambient.frag Shaders/particle.frag)
 
 create_directory_link(${CMAKE_CURRENT_SOURCE_DIR}/Shaders ${CMAKE_CURRENT_BINARY_DIR}/Shaders)
 create_directory_link(${CMAKE_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)

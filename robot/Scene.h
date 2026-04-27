@@ -74,6 +74,8 @@ public:
     std::span<const Light> GetLights() const;
 
     const Texture& GetSparkTexture() const;
+    const Texture& GetMirrorTexture() const;
+
     std::span<const Particle> GetParticles() const;
 
 private:
@@ -98,7 +100,9 @@ private:
 
     std::vector<Light> m_Lights;
 
+    Texture m_MirrorTexture;
     Texture m_SparkTexture;
+
     std::vector<Particle> m_Particles;
 
 	std::unordered_set<ref::Key> m_PressedKeys;

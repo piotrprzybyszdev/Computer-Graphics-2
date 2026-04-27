@@ -34,6 +34,7 @@ Scene::Scene()
     m_Lights.push_back(Light(glm::vec4(0.5f, 1.0f, 0.0f, 1.0f)));
 
     m_SparkTexture = LoadTexture("assets/spark.png");
+    m_MirrorTexture = LoadTexture("assets/mirror.png");
 
     const size_t particleCount = 10;
     m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
@@ -222,6 +223,11 @@ std::span<const Light> Scene::GetLights() const
 const Texture& Scene::GetSparkTexture() const
 {
     return m_SparkTexture;
+}
+
+const Texture& Scene::GetMirrorTexture() const
+{
+    return m_MirrorTexture;
 }
 
 std::span<const Particle> Scene::GetParticles() const
@@ -453,6 +459,7 @@ Mesh Scene::CreateUnitSquareMesh()
         .VertexOffset = static_cast<uint32_t>(m_Meshes.VertexIndices.size()),
         .TriangleOffset = static_cast<uint32_t>(m_Meshes.Triangles.size()),
         .EdgeOffset = static_cast<uint32_t>(m_Meshes.Edges.size()),
+        .Color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
     };
 
     m_Meshes.Positions.emplace_back(-1, -1, 0, 1);
