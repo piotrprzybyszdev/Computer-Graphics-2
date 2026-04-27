@@ -6,7 +6,6 @@
 #include <cassert>
 #include <format>
 #include <fstream>
-#include <iostream>
 #include <numbers>
 #include <ranges>
 #include <vector>
@@ -83,9 +82,6 @@ void Scene::OnUpdate(float timeStep)
 
 void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */)
 {
-    // TODO: camera controls
-    std::cout << "Key event: " << static_cast<uint32_t>(key) << " " << static_cast<uint32_t>(action) << std::endl;
-
 	if (action == ref::KeyAction::Press || action == ref::KeyAction::Repeat)
         m_PressedKeys.insert(key);
     else if (action == ref::KeyAction::Release)
@@ -94,9 +90,6 @@ void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */
 
 void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods /* mods */)
 {
-    // TODO: camera controls
-    std::cout << "Mouse button event: " << static_cast<uint32_t>(button) << " " << static_cast<uint32_t>(action) << std::endl;
-
     if (button == ref::Button::Right)
     {
         m_IsRightMouseDown = action == ref::ButtonAction::Press;
@@ -106,9 +99,6 @@ void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref
 
 void Scene::OnCursorMoveEvent(double xpos, double ypos)
 {
-    // TODO: camera controls
-    std::cout << "Mouse move event: " << xpos << " " << ypos << std::endl;
-
     if (!m_IsRightMouseDown)
         return;
 
@@ -319,7 +309,7 @@ Mesh Scene::CreateCylinderMesh(float radius, float height, uint32_t divr, uint32
             for (uint32_t i = 0; i <= divr; i++)
             {
                 m_Meshes.Triangles.emplace_back(prevVertexOffset + i, prevVertexOffset + (i + 1) % divr, vertexOffset + i);
-                m_Meshes.Triangles.emplace_back(vertexOffset + i, vertexOffset + (i + 1) % divr, prevVertexOffset + (i + 1) % divr);
+                m_Meshes.Triangles.emplace_back(vertexOffset + i, prevVertexOffset + (i + 1) % divr, vertexOffset + (i + 1) % divr);
             }
         }
     }
@@ -327,7 +317,7 @@ Mesh Scene::CreateCylinderMesh(float radius, float height, uint32_t divr, uint32
     assert(m_Meshes.Positions.size() - mesh.PositionOffset == divr * divh + divr);
     assert(m_Meshes.VertexNormals.size() - mesh.VertexOffset == divr * divh + divr);
 
-    auto createLid = [&](float sign, uint32_t vertexOffset) {
+    auto createLid = [&](float sign, uint32_t vertexOffset, bool back) {
         createCircle(-height / 2.0f);
 
         m_Meshes.Positions.emplace_back(0.0f, 0.0f, 0.0f, 1.0f);
@@ -336,12 +326,13 @@ Mesh Scene::CreateCylinderMesh(float radius, float height, uint32_t divr, uint32
 
         for (uint32_t i = 0; i <= divr; i++)
         {
-            m_Meshes.Triangles.push_back(vertexOffset + glm::uvec3(0u, i, (i + 1) % divr));
+            glm::uvec3 triangle = back ? glm::uvec3(0u, i, (i + 1) % divr) : glm::uvec3(0u, (i + 1) % divr, i);
+            m_Meshes.Triangles.push_back(vertexOffset + triangle);
         }
     };
 
-    createLid(-1.0f, 0);
-    createLid(1.0f, divr * divh);
+    createLid(-1.0f, 0, false);
+    createLid(1.0f, divr * divh, true);
 
     mesh.PositionCount = static_cast<uint32_t>(m_Meshes.Positions.size()) - mesh.PositionOffset;
     mesh.VertexCount = static_cast<uint32_t>(m_Meshes.VertexIndices.size()) - mesh.VertexOffset;
@@ -440,8 +431,8 @@ Mesh Scene::CreateUnitCubeMesh()
 
     for (int i = 0; i < 6; i++)
     {
-        m_Meshes.Triangles.push_back(i * 4u + glm::uvec3(0, 1, 2));
-        m_Meshes.Triangles.push_back(i * 4u + glm::uvec3(2, 3, 0));
+        m_Meshes.Triangles.push_back(i * 4u + glm::uvec3(0, 2, 1));
+        m_Meshes.Triangles.push_back(i * 4u + glm::uvec3(0, 3, 2));
     }
 
     mesh.PositionCount = static_cast<uint32_t>(m_Meshes.Positions.size()) - mesh.PositionOffset;
@@ -472,7 +463,7 @@ Mesh Scene::CreateUnitSquareMesh()
     m_Meshes.VertexIndices.push_back(0);
     m_Meshes.VertexIndices.push_back(1);
     m_Meshes.VertexIndices.push_back(2);
-    m_Meshes.VertexIndices.push_back(3);        
+    m_Meshes.VertexIndices.push_back(3);
     m_Meshes.Triangles.push_back(glm::uvec3(0, 1, 2));
     m_Meshes.Triangles.push_back(glm::uvec3(2, 3, 0));
 
