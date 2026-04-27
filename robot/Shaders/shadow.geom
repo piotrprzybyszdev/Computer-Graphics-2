@@ -1,6 +1,6 @@
 #version 460
 
-struct RobotMesh
+struct Mesh
 {
     uint PositionOffset;
     uint PositionCount;
@@ -10,6 +10,7 @@ struct RobotMesh
     uint TriangleCount;
     uint EdgeOffset;
     uint EdgeCount;
+    vec4 Color;
 };
 
 struct Light
@@ -28,7 +29,7 @@ layout(set = 0, binding = 1) readonly buffer PositionBuffer {
 };
 
 layout(set = 0, binding = 2) readonly buffer MeshBuffer {
-    RobotMesh s_Meshes[];
+    Mesh s_Meshes[];
 };
 
 layout(set = 0, binding = 3) uniform TransformBuffer {

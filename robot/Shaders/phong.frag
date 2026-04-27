@@ -17,6 +17,7 @@ layout(set = 0, binding = 4) readonly buffer LightBuffer {
 
 layout (location = 0) in vec4 v_Position;
 layout (location = 1) in vec4 v_Normal;
+layout (location = 2) in vec4 v_Color;
 
 layout (location = 0) out vec4 o_FragColor;
 
@@ -32,5 +33,5 @@ void main()
     const float diffuse = max(dot(N, L), 0.0f);
     const float specular = pow(max(dot(R, V), 0.0f), m);
 
-    o_FragColor = vec4(vec3(ka + kd * diffuse + ks * specular), 1.0f);
+    o_FragColor = vec4(v_Color.rgb * vec3(ka + kd * diffuse + ks * specular), 1.0f);
 }

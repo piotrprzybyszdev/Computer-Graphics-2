@@ -1,6 +1,6 @@
 #version 460
 
-struct RobotMesh
+struct Mesh
 {
     uint PositionOffset;
     uint PositionCount;
@@ -10,6 +10,7 @@ struct RobotMesh
     uint TriangleCount;
     uint EdgeOffset;
     uint EdgeCount;
+    vec4 Color;
 };
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
@@ -23,7 +24,7 @@ layout(set = 0, binding = 1) readonly buffer PositionBuffer {
 };
 
 layout(set = 0, binding = 2) readonly buffer MeshBuffer {
-    RobotMesh s_Meshes[];
+    Mesh s_Meshes[];
 };
 
 layout(set = 0, binding = 3) uniform TransformBuffer {
@@ -39,6 +40,7 @@ layout (location = 1) in vec4 v_Normal;
 
 layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec4 o_Normal;
+layout (location = 2) out vec4 o_Color;
 
 void main()
 {
@@ -47,6 +49,7 @@ void main()
 
     o_Position = transform * vec4(s_Positions[positionOffset + v_PositionIndex].xyz, 1.0f);
     o_Normal = transform * vec4(v_Normal.xyz, 0.0f);
+    o_Color = s_Meshes[pc_MeshIndex].Color;
 
     gl_Position = u_CameraProjection * u_CameraView * o_Position;
 }

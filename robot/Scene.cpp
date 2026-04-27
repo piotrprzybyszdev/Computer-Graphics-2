@@ -239,6 +239,7 @@ Mesh Scene::LoadRobotMesh(const std::filesystem::path& path)
         .VertexOffset = static_cast<uint32_t>(m_Meshes.VertexIndices.size()),
         .TriangleOffset = static_cast<uint32_t>(m_Meshes.Triangles.size()),
         .EdgeOffset = static_cast<uint32_t>(m_Meshes.Edges.size()),
+        .Color = glm::vec4(0.0, 1.0f, 0.0f, 1.0f),
     };
 
     file >> mesh.PositionCount;
@@ -281,6 +282,7 @@ Mesh Scene::CreateCylinderMesh(float radius, float height, uint32_t divr, uint32
         .VertexOffset = static_cast<uint32_t>(m_Meshes.VertexIndices.size()),
         .TriangleOffset = static_cast<uint32_t>(m_Meshes.Triangles.size()),
         .EdgeOffset = static_cast<uint32_t>(m_Meshes.Edges.size()),
+        .Color = glm::vec4(0.0, 1.0f, 0.0f, 1.0f),
     };
 
     auto createCircle = [&](float z) {
@@ -349,6 +351,7 @@ Mesh Scene::CreateUnitCubeMesh()
         .VertexOffset = static_cast<uint32_t>(m_Meshes.VertexIndices.size()),
         .TriangleOffset = static_cast<uint32_t>(m_Meshes.Triangles.size()),
         .EdgeOffset = static_cast<uint32_t>(m_Meshes.Edges.size()),
+        .Color = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
     };
 
     m_Meshes.Positions.emplace_back(-1, -1, 1, 1);

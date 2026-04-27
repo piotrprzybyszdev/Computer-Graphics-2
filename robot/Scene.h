@@ -16,6 +16,7 @@ struct Mesh
     uint32_t TriangleCount;
     uint32_t EdgeOffset;
     uint32_t EdgeCount;
+    glm::vec4 Color;
 };
 
 struct Texture
