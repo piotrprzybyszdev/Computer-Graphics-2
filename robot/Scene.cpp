@@ -1,3 +1,4 @@
+#define GLM_FORCE_LEFT_HANDED
 #include <glm/gtc/matrix_transform.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -21,17 +22,16 @@ Scene::Scene()
     m_Meshes.Meshes.push_back(CreateCylinderMesh(1.0f, 10.0f, 10, 3));
     
     m_Meshes.Transforms.push_back(
-        glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.5f, -1.0f, -3.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f))
+        glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-0.5f, -1.0f, -2.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f, 0.4f, 0.5f))
     );
 
     m_Meshes.Meshes.push_back(CreateUnitCubeMesh());
-    m_Meshes.Transforms.push_back(glm::scale(glm::mat4x4(1.0f), glm::vec3(3.0f, 2.0f, 3.0f)));
+    m_Meshes.Transforms.push_back(glm::scale(glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(4.0f, 2.0f, 3.0f)));
 
-    // TODO: mirror transform matrix
     m_Meshes.Meshes.push_back(CreateUnitSquareMesh());
-    m_Meshes.Transforms.push_back(glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(2.0f, -0.3f, -1.5f)), glm::radians(-40.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.4f)));
+    m_Meshes.Transforms.push_back(glm::scale(glm::rotate(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.8f, 0.3f, -0.25f)), glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(30.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::vec3(0.4f)));
 
-    m_Lights.push_back(Light(glm::vec4(0.5f, 1.0f, 0.0f, 1.0f)));
+    m_Lights.push_back(Light(glm::vec4(-1.5f, 1.0f, 1.0f, 1.0f)));
 
     m_SparkTexture = LoadTexture("assets/spark.png");
     m_MirrorTexture = LoadTexture("assets/mirror.png");
@@ -48,30 +48,73 @@ void Scene::OnResize(uint32_t width, uint32_t height)
     m_Camera.Projection = glm::perspectiveFov(45.0f, static_cast<float>(width), static_cast<float>(height), 0.1f, 1000.0f);
 }
 
+static void InverseKinematics(glm::vec3 pos, glm::vec3 normal, float& a1, float& a2, float& a3, float& a4, float& a5)
+{
+    float l1 = .91f, l2 = .81f, l3 = .33f, dy = .27f, dz = .26f;
+    normal = glm::normalize(normal);
+    glm::vec3 pos1 = pos + normal * l3;
+    float e = sqrtf(pos1.z * pos1.z + pos1.x * pos1.x - dz * dz);
+    a1 = atan2(pos1.z, -pos1.x) + atan2(dz, e);
+    glm::vec3 pos2(e, pos1.y - dy, .0f);
+    a3 = -acosf(glm::min(1.0f, (pos2.x * pos2.x + pos2.y * pos2.y - l1 * l1 - l2 * l2) / (2.0f * l1 * l2)));
+    float k = l1 + l2 * cosf(a3), l = l2 * sinf(a3);
+    a2 = -atan2(pos2.y, sqrtf(pos2.x * pos2.x + pos2.z * pos2.z)) - atan2(l, k);
+    glm::vec3 normal1;
+    normal1 = glm::vec3(glm::rotate(glm::mat4x4(1.0f), -a1, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(normal.x, normal.y, normal.z, .0f));
+    normal1 = glm::vec3(glm::rotate(glm::mat4x4(1.0f), -(a2 + a3), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::vec4(normal1.x, normal1.y, normal1.z, .0f));
+    a5 = acosf(normal1.x);
+    a4 = atan2(normal1.z, normal1.y);
+}
+
 void Scene::OnUpdate(float timeStep)
 {
-    const float speed = 0.002f;
+    // camera
+    {
+        const float speed = 0.002f;
 
-	const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
-	glm::vec3 cameraRight = glm::normalize(glm::cross(m_CameraForward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+        glm::vec3 cameraRight = glm::normalize(glm::cross(m_CameraForward, glm::vec3(0.0f, 1.0f, 0.0f)));
 
-    if (m_PressedKeys.contains(ref::Key::W)) m_CameraPosition += timeStep * speed * m_CameraForward;
-    if (m_PressedKeys.contains(ref::Key::S)) m_CameraPosition -= timeStep * speed * m_CameraForward;
-    if (m_PressedKeys.contains(ref::Key::A)) m_CameraPosition += timeStep * speed * cameraRight;
-    if (m_PressedKeys.contains(ref::Key::D)) m_CameraPosition -= timeStep * speed * cameraRight;
-    if (m_PressedKeys.contains(ref::Key::Q)) m_CameraPosition += timeStep * speed * up;
-    if (m_PressedKeys.contains(ref::Key::E)) m_CameraPosition -= timeStep * speed * up;
+        if (m_PressedKeys.contains(ref::Key::W)) m_CameraPosition += timeStep * speed * m_CameraForward;
+        if (m_PressedKeys.contains(ref::Key::S)) m_CameraPosition -= timeStep * speed * m_CameraForward;
+        if (m_PressedKeys.contains(ref::Key::A)) m_CameraPosition -= timeStep * speed * cameraRight;
+        if (m_PressedKeys.contains(ref::Key::D)) m_CameraPosition += timeStep * speed * cameraRight;
+        if (m_PressedKeys.contains(ref::Key::Q)) m_CameraPosition += timeStep * speed * up;
+        if (m_PressedKeys.contains(ref::Key::E)) m_CameraPosition -= timeStep * speed * up;
 
-	m_Camera.Origin = glm::vec4(m_CameraPosition, 1.0f);
-    m_Camera.View = glm::lookAt(
-        m_CameraPosition,
-        m_CameraPosition + m_CameraForward,
-        up
-    );
+        m_Camera.Origin = glm::vec4(m_CameraPosition, 1.0f);
+        m_Camera.View = glm::lookAt(
+            m_CameraPosition,
+            m_CameraPosition + m_CameraForward,
+            up
+        );
+    }
 
-    // TODO: inverse kinematics
-    for (int i = 0; i < 6; i++)
-        m_Meshes.Transforms[i] = glm::mat4x4(1.0f);
+    // inverse kinematics
+    {
+        const glm::mat4x4& transform = m_Meshes.Transforms[GetMirrorMeshIndex()];
+
+        const glm::vec3 xaxis = transform * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+        const glm::vec3 yaxis = transform * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        const glm::vec3 zaxis = transform * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
+
+        const glm::vec3 center = transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+        static float time = 0.0f;
+        const float radius = 0.2f;
+        time += timeStep;
+        const glm::vec3 point = center + radius * normalize(xaxis) * glm::cos(time / 1000.0f) + radius * normalize(yaxis) * glm::sin(time / 1000.0f);
+
+        std::array<float, 5> angles;
+        InverseKinematics(point, zaxis, angles[0], angles[1], angles[2], angles[3], angles[4]);
+
+        m_Meshes.Transforms[0] = glm::mat4x4(1.0f);
+        m_Meshes.Transforms[1] = m_Meshes.Transforms[0] * glm::rotate(glm::mat4x4(1.0f), angles[0], glm::vec3(0.0f, 1.0f, 0.0f));
+        m_Meshes.Transforms[2] = m_Meshes.Transforms[1] * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.27f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), angles[1], glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, -0.27f, 0.0f));
+        m_Meshes.Transforms[3] = m_Meshes.Transforms[2] * glm::translate(glm::mat4x4(1.0f), glm::vec3(-0.91f, 0.27f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), angles[2], glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.91f, -0.27f, 0.0f));
+        m_Meshes.Transforms[4] = m_Meshes.Transforms[3] * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.27f, -0.26f)) * glm::rotate(glm::mat4x4(1.0f), angles[3], glm::vec3(1.0f, 0.0f, 0.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, -0.27f, 0.26f));
+        m_Meshes.Transforms[5] = m_Meshes.Transforms[4] * glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.72f, 0.27f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), angles[4], glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(1.72f, -0.27f, 0.0f));
+    }
 
     // TODO: particle simulation
     for (int i = 0; i < m_Particles.size(); i++)
@@ -117,7 +160,7 @@ void Scene::OnCursorMoveEvent(double xpos, double ypos)
     m_LastMouseX = xpos;
     m_LastMouseY = ypos;
 
-    m_Yaw -= dx * m_MouseSensitivity;
+    m_Yaw += dx * m_MouseSensitivity;
     m_Pitch -= dy * m_MouseSensitivity;
     m_Pitch = std::clamp(m_Pitch, -89.0f, 89.0f);
 

@@ -174,7 +174,6 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 
         pipelineInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
         pipelineInfo.RasterizationState.setLineWidth(1.0f);
-        pipelineInfo.RasterizationState.setFrontFace(vk::FrontFace::eClockwise);
         pipelineInfo.DepthStencilState.setStencilTestEnable(vk::True);
         pipelineInfo.DepthStencilState.setBack(vk::StencilOpState().setWriteMask(0xff).setCompareOp(vk::CompareOp::eAlways).setPassOp(vk::StencilOp::eReplace).setReference(1));
         pipelineInfo.DepthStencilState.setFront(vk::StencilOpState().setWriteMask(0xff).setCompareOp(vk::CompareOp::eAlways).setPassOp(vk::StencilOp::eReplace).setReference(1));
@@ -225,7 +224,6 @@ RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
 
         pipelineInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
         pipelineInfo.RasterizationState.setLineWidth(1.0f);
-        pipelineInfo.RasterizationState.setFrontFace(vk::FrontFace::eClockwise);
         pipelineInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eBack);
         pipelineInfo.DepthStencilState.setDepthTestEnable(vk::True);
         pipelineInfo.DepthStencilState.setDepthWriteEnable(vk::True);
