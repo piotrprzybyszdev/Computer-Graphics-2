@@ -17,6 +17,8 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4x4 u_CameraProjection;
     mat4x4 u_CameraView;
     vec4 u_CameraOrigin;
+    uint u_IsMirror;
+    vec4 u_CameraPosition;
 };
 
 layout(set = 0, binding = 1) readonly buffer PositionBuffer {

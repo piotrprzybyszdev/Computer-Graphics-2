@@ -43,6 +43,10 @@ struct CameraConstants
     glm::mat4x4 Projection;
     glm::mat4x4 View;
     glm::vec4 Origin;
+    glm::uint IsMirror;
+    glm::uvec3 pad0;
+    glm::vec4 CameraPosition;
+    glm::vec4 MirrorNormal;
 };
 
 RobotApplicationState::RobotApplicationState(const ApplicationStateSpec& spec)
@@ -693,6 +697,9 @@ void RobotApplicationState::OnUpdate(float timeStep)
             .Projection = m_Scene.GetCameraProjection(),
             .View = m_Scene.GetCameraView(),
             .Origin = m_Scene.GetCameraOrigin(),
+            .IsMirror = 0,
+            .CameraPosition = m_Scene.GetCameraOrigin(),
+            .MirrorNormal = glm::vec4(),
         };
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
@@ -703,6 +710,9 @@ void RobotApplicationState::OnUpdate(float timeStep)
             .Projection = m_Scene.GetCameraProjection(),
             .View = m_Scene.GetMirrorViewMatrix(),
             .Origin = m_Scene.GetMirrorCameraOrigin(),
+            .IsMirror = 1,
+            .CameraPosition = m_Scene.GetCameraOrigin(),
+            .MirrorNormal = m_Scene.GetTransforms()[m_Scene.GetMirrorMeshIndex()] * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),
         };
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Mirror Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));

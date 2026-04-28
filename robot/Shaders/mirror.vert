@@ -17,6 +17,8 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4x4 u_CameraProjection;
     mat4x4 u_CameraView;
     vec4 u_CameraOrigin;
+    uint u_IsMirror;
+    vec4 u_CameraPosition;
 };
 
 layout(set = 0, binding = 1) readonly buffer PositionBuffer {
@@ -38,8 +40,9 @@ layout(push_constant) uniform PushConstants {
 layout (location = 0) in uint v_PositionIndex;
 layout (location = 1) in vec4 v_Normal;
 
-layout (location = 0) out vec2 o_UV;
-layout (location = 1) out float o_Alpha;
+layout (location = 0) out vec4 o_Position;
+layout (location = 1) out vec2 o_UV;
+layout (location = 2) out float o_Alpha;
 
 void main()
 {
@@ -49,5 +52,6 @@ void main()
     o_UV = (1.0f + s_Positions[positionOffset + v_PositionIndex].xy) / 2.0f;
     o_Alpha = 0.5f;
 
-    gl_Position = u_CameraProjection * u_CameraView * transform * vec4(s_Positions[positionOffset + v_PositionIndex].xyz, 1.0f);
+    o_Position = transform * vec4(s_Positions[positionOffset + v_PositionIndex].xyz, 1.0f);
+    gl_Position = u_CameraProjection * u_CameraView * o_Position;
 }

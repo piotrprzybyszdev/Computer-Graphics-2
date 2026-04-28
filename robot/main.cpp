@@ -16,6 +16,7 @@ int main()
     ApplicationBuilder builder;
     builder.EnableBase();
     builder.EnableFeatures(vk::PhysicalDeviceFeatures2().features.setGeometryShader(vk::True));
+    builder.EnableFeatures(vk::PhysicalDeviceVulkan13Features().setShaderDemoteToHelperInvocation(vk::True));
 
     {
         vulkan::Application application = builder.CreateApplication("REF");
