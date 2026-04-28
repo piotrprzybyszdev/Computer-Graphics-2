@@ -20,9 +20,20 @@ int main()
 
     {
         vulkan::Application application = builder.CreateApplication("REF");
+        application.GetShaderLibrary().SetShaderCachePath("ShaderCache");
+        application.GetShaderLibrary().AddShadersFromDirectory("Shaders");
+
+        vulkan::ErrorApplicationState::AddToApplication(application);
+        vulkan::CompilingShadersApplicationState::AddToApplication(application, "Robot State");
+
         application.AddAndCreateState<RobotApplicationState>("Robot State");
-        application.Run("Robot State");
+
+        application.Run(vulkan::CompilingShadersApplicationState::g_StateName);
+
+        application.GetShaderLibrary().PruneShaderCache();
     }
 
     ApplicationBuilder::ShutdownSystems();
+
+    return EXIT_SUCCESS;
 }

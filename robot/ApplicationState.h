@@ -29,6 +29,9 @@ public:
     RobotApplicationState(const ref::vulkan::ApplicationStateSpec& spec);
     ~RobotApplicationState() override;
 
+    void OnEnter(ref::vulkan::ApplicationState* previous) override;
+    void OnExit(ref::vulkan::ApplicationState* next) override;
+
     void OnResize(const ref::vulkan::Swapchain* swapchain) override;
 
     void OnUpdate(float timeStep) override;
@@ -36,6 +39,11 @@ public:
 
 private:
     ref::vulkan::Queue m_MainQueue;
+
+    ref::vulkan::GraphicsPipelineInstanceId m_ParticlePipelineId, m_ParticleReflectionPipelineId;
+    ref::vulkan::GraphicsPipelineInstanceId m_MirrorStencilPipelineId, m_ReflectionPipelineId, m_MirrorPipelineId;
+    ref::vulkan::GraphicsPipelineInstanceId m_LightingPipelineId, m_ShadowPipelineId, m_AmbientPipelineId;
+
     std::unique_ptr<RobotUserInterfaceState> m_UserInterfaceState;
     std::unique_ptr<ref::UserInterface> m_UserInterface;
     std::unique_ptr<ref::vulkan::FrameGraph> m_FrameGraph;
