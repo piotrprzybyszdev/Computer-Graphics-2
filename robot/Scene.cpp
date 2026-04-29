@@ -37,7 +37,7 @@ Scene::Scene()
     m_SparkTexture = LoadTexture("assets/spark.png");
     m_MirrorTexture = LoadTexture("assets/mirror.png");
 
-    const size_t particleCount = 100;
+    const size_t particleCount = 1000;
     //m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
     m_Particles.resize(particleCount, Particle {
         .Transform = glm::mat4x4(1.0f),
@@ -48,7 +48,7 @@ Scene::Scene()
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(0.0f, 5.0f);
+    std::uniform_real_distribution<float> dis(0.0f, 10.0f);
 
     for (size_t i = 0; i < particleCount; i++)
     {
@@ -153,7 +153,7 @@ void Scene::OnUpdate(float timeStep)
         // TODO: particle simulation
         for (int i = 0; i < m_Particles.size(); i++)
         {
-            if (m_Particles[i].Age > 5.0f)
+            if (m_Particles[i].Age > 10.0f)
             {
                 float rand1 = dis(gen);
                 float rand2 = dis(gen);
