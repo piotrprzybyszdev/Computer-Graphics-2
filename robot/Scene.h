@@ -121,6 +121,7 @@ private:
 	glm::vec3 m_CameraPosition;
     glm::vec3 m_CameraForward;
 
+	bool m_AnimationEnabled = true;
 private:
     Mesh LoadRobotMesh(const std::filesystem::path& path);
     Mesh CreateCylinderMesh(float radius, float height, uint32_t divr, uint32_t divh);

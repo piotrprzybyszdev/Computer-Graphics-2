@@ -38,7 +38,7 @@ Scene::Scene()
     m_MirrorTexture = LoadTexture("assets/mirror.png");
 
     const size_t particleCount = 1000;
-    //m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
+
     m_Particles.resize(particleCount, Particle {
         .Transform = glm::mat4x4(1.0f),
         .Position = glm::vec3(0.0f, 0.0f, 0.0f),
@@ -107,6 +107,7 @@ void Scene::OnUpdate(float timeStep)
     }
 
     // inverse kinematics
+    if (m_AnimationEnabled)
     {
         const glm::mat4x4 &transform = m_Meshes.Transforms[GetMirrorMeshIndex()];
 
@@ -170,7 +171,7 @@ void Scene::OnUpdate(float timeStep)
             {
                 m_Particles[i].Velocity += glm::vec3(0.0f, -1.0f, 0.0f) * timeStep / 1000.0f;
                 m_Particles[i].Position += m_Particles[i].Velocity * timeStep / 1000.0f;
-                m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.1f / 1000.0f);
+                m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.4f / 1000.0f);
                 m_Particles[i].Age += timeStep / 1000.0f;
             }
             
@@ -186,19 +187,18 @@ void Scene::OnUpdate(float timeStep)
             ));
 
             m_Particles[i].Transform = glm::translate(glm::mat4x4(1.0f), m_Particles[i].Position) * rotation;
-        
-            //m_Particles[i] = {
-            //    .Transform = glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(360.0f * (i / static_cast<float>(m_Particles.size()))), glm::vec3(0.0f, 0.0f, 1.0f)),
-            //    .Alpha = 0.25f,
-            //};
         }
     }
 }
 
 void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */)
 {
-	if (action == ref::KeyAction::Press || action == ref::KeyAction::Repeat)
+    if (action == ref::KeyAction::Press || action == ref::KeyAction::Repeat)
+    {
         m_PressedKeys.insert(key);
+        if (key == ref::Key::Space && action == ref::KeyAction::Press)
+            m_AnimationEnabled = !m_AnimationEnabled;
+    }
     else if (action == ref::KeyAction::Release)
         m_PressedKeys.erase(key);
 }
