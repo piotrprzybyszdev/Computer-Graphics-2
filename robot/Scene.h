@@ -40,6 +40,13 @@ struct Particle
     float Age;
 };
 
+struct ShaderParticle
+{
+    glm::mat4x4 Transform;
+    float Alpha;
+    glm::vec3 pad0;
+};
+
 class Scene
 {
 public:
@@ -78,7 +85,7 @@ public:
     const Texture& GetSparkTexture() const;
     const Texture& GetMirrorTexture() const;
 
-    std::span<const Particle> GetParticles() const;
+    std::span<const ShaderParticle> GetParticles() const;
 
 private:
     struct Camera
@@ -106,6 +113,7 @@ private:
     Texture m_SparkTexture;
 
     std::vector<Particle> m_Particles;
+    std::vector<ShaderParticle> m_ShaderParticles;
 
 	std::unordered_set<ref::Key> m_PressedKeys;
     

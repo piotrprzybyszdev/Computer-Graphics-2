@@ -37,7 +37,7 @@ Scene::Scene()
     m_SparkTexture = LoadTexture("assets/spark.png");
     m_MirrorTexture = LoadTexture("assets/mirror.png");
 
-    const size_t particleCount = 1000;
+    const size_t particleCount = 500;
 
     m_Particles.resize(particleCount, Particle {
         .Transform = glm::mat4x4(1.0f),
@@ -45,6 +45,12 @@ Scene::Scene()
         .Alpha = 0.0f,
         .Velocity = glm::vec3(0.0f, -1.0f, 0.0f),
 		});
+
+    m_ShaderParticles.resize(particleCount, ShaderParticle {
+        .Transform = glm::mat4x4(1.0f),
+        .Alpha = 0.0f,
+        .pad0 = glm::vec3(0.0f)
+        });
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -187,6 +193,9 @@ void Scene::OnUpdate(float timeStep)
             ));
 
             m_Particles[i].Transform = glm::translate(glm::mat4x4(1.0f), m_Particles[i].Position) * rotation;
+
+            m_ShaderParticles[i].Transform = m_Particles[i].Transform;
+            m_ShaderParticles[i].Alpha = m_Particles[i].Alpha;
         }
     }
 }
@@ -344,9 +353,9 @@ const Texture& Scene::GetMirrorTexture() const
     return m_MirrorTexture;
 }
 
-std::span<const Particle> Scene::GetParticles() const
+std::span<const ShaderParticle> Scene::GetParticles() const
 {
-    return m_Particles;
+    return m_ShaderParticles;
 }
 
 Mesh Scene::LoadRobotMesh(const std::filesystem::path& path)
