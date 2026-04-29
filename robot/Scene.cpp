@@ -9,6 +9,7 @@
 #include <fstream>
 #include <numbers>
 #include <ranges>
+#include <random>
 #include <vector>
 
 #include "Scene.h"
@@ -36,8 +37,23 @@ Scene::Scene()
     m_SparkTexture = LoadTexture("assets/spark.png");
     m_MirrorTexture = LoadTexture("assets/mirror.png");
 
-    const size_t particleCount = 10;
-    m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
+    const size_t particleCount = 100;
+    //m_Particles.resize(particleCount, Particle(glm::mat4x4(1.0f), 0.25f));
+    m_Particles.resize(particleCount, Particle {
+        .Transform = glm::mat4x4(1.0f),
+        .Position = glm::vec3(0.0f, 0.0f, 0.0f),
+        .Alpha = 0.0f,
+        .Velocity = glm::vec3(0.0f, -1.0f, 0.0f),
+		});
+
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(0.0f, 5.0f);
+
+    for (size_t i = 0; i < particleCount; i++)
+    {
+        m_Particles[i].Age = dis(gen);
+    }   
 
     m_CameraPosition = glm::vec3(0.0f, 0.0f, 2.0f);
     m_CameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -92,7 +108,7 @@ void Scene::OnUpdate(float timeStep)
 
     // inverse kinematics
     {
-        const glm::mat4x4& transform = m_Meshes.Transforms[GetMirrorMeshIndex()];
+        const glm::mat4x4 &transform = m_Meshes.Transforms[GetMirrorMeshIndex()];
 
         const glm::vec3 xaxis = transform * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
         const glm::vec3 yaxis = transform * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
@@ -114,14 +130,69 @@ void Scene::OnUpdate(float timeStep)
         m_Meshes.Transforms[3] = m_Meshes.Transforms[2] * glm::translate(glm::mat4x4(1.0f), glm::vec3(-0.91f, 0.27f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), angles[2], glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.91f, -0.27f, 0.0f));
         m_Meshes.Transforms[4] = m_Meshes.Transforms[3] * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.27f, -0.26f)) * glm::rotate(glm::mat4x4(1.0f), angles[3], glm::vec3(1.0f, 0.0f, 0.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, -0.27f, 0.26f));
         m_Meshes.Transforms[5] = m_Meshes.Transforms[4] * glm::translate(glm::mat4x4(1.0f), glm::vec3(-1.72f, 0.27f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), angles[4], glm::vec3(0.0f, 0.0f, 1.0f)) * glm::translate(glm::mat4x4(1.0f), glm::vec3(1.72f, -0.27f, 0.0f));
-    }
 
-    // TODO: particle simulation
-    for (int i = 0; i < m_Particles.size(); i++)
-        m_Particles[i] = {
-            .Transform = glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(360.0f * (i / static_cast<float>(m_Particles.size()))), glm::vec3(0.0f, 0.0f, 1.0f)),
-            .Alpha = 0.25f,
-        };
+        auto uniformSampleHemisphere = [](const glm::vec2 &u) -> glm::vec4
+            {
+                const float z = u.x;
+                const float r = glm::sqrt(glm::max(0.0f, 1.0f - z * z));
+                const float phi = 2.0f * glm::pi<float>() * u.y;
+
+                return glm::vec4(
+                    r * glm::cos(phi),
+                    r * glm::sin(phi),
+                    z,
+                    1.0f
+                );
+            };
+
+        // Setup uniform random number generator
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+
+        // TODO: particle simulation
+        for (int i = 0; i < m_Particles.size(); i++)
+        {
+            if (m_Particles[i].Age > 5.0f)
+            {
+                float rand1 = dis(gen);
+                float rand2 = dis(gen);
+
+                Particle particle {
+                    .Position = point,
+                    .Alpha = 0.5f,
+                    .Velocity = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(30.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * uniformSampleHemisphere(glm::vec2(rand1, rand2)),
+                    .Age = 0.0f,
+                };
+                m_Particles[i] = particle;
+            }
+            else
+            {
+                m_Particles[i].Velocity += glm::vec3(0.0f, -1.0f, 0.0f) * timeStep / 1000.0f;
+                m_Particles[i].Position += m_Particles[i].Velocity * timeStep / 1000.0f;
+                m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.1f / 1000.0f);
+                m_Particles[i].Age += timeStep / 1000.0f;
+            }
+            
+            glm::vec3 normal = glm::normalize(m_CameraPosition - m_Particles[i].Position);
+			glm::vec3 tangent = glm::normalize(glm::cross(m_Particles[i].Velocity, normal));
+			glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
+
+            glm::mat4 rotation = glm::transpose(glm::mat4(
+                glm::vec4(tangent, 0.0f),
+                glm::vec4(bitangent, 0.0f),
+                glm::vec4(normal, 0.0f),
+                glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
+            ));
+
+            m_Particles[i].Transform = glm::translate(glm::mat4x4(1.0f), m_Particles[i].Position) * rotation;
+        
+            //m_Particles[i] = {
+            //    .Transform = glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(360.0f * (i / static_cast<float>(m_Particles.size()))), glm::vec3(0.0f, 0.0f, 1.0f)),
+            //    .Alpha = 0.25f,
+            //};
+        }
+    }
 }
 
 void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */)

@@ -34,8 +34,10 @@ struct Light
 struct Particle
 {
     glm::mat4x4 Transform;
+    glm::vec3 Position;
     float Alpha;
-    glm::vec3 pad0;
+    glm::vec3 Velocity;
+    float Age;
 };
 
 class Scene
