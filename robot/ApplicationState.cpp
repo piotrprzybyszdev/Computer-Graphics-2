@@ -19,8 +19,6 @@ RobotUserInterfaceState::RobotUserInterfaceState(Scene& scene) : m_Scene(scene)
 
 void RobotUserInterfaceState::OnUpdate(float /* timeStep */)
 {
-    ImGui::Begin("Bonjur");
-    ImGui::End();
 }
 
 void RobotUserInterfaceState::OnKeyEvent(Key key, KeyAction action, Mods mods)
