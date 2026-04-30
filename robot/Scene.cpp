@@ -43,18 +43,13 @@ Scene::Scene()
         .Transform = glm::mat4x4(1.0f),
         .Position = glm::vec3(0.0f, 0.0f, 0.0f),
         .Alpha = 0.0f,
-        .Velocity = glm::vec3(0.0f, -1.0f, 0.0f),
+        .Velocity = glm::vec3(0.0f, 0.0f, 0.0f),
+        .Age = 0.0f,
 		});
-
-    m_ShaderParticles.resize(particleCount, ShaderParticle {
-        .Transform = glm::mat4x4(1.0f),
-        .Alpha = 0.0f,
-        .pad0 = glm::vec3(0.0f)
-        });
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(0.0f, 10.0f);
+    std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
     for (size_t i = 0; i < particleCount; i++)
     {
@@ -160,7 +155,7 @@ void Scene::OnUpdate(float timeStep)
         // TODO: particle simulation
         for (int i = 0; i < m_Particles.size(); i++)
         {
-            if (m_Particles[i].Age > 10.0f)
+            if (m_Particles[i].Age > 1.0f)
             {
                 float rand1 = dis(gen);
                 float rand2 = dis(gen);
@@ -177,7 +172,7 @@ void Scene::OnUpdate(float timeStep)
             {
                 m_Particles[i].Velocity += glm::vec3(0.0f, -1.0f, 0.0f) * timeStep / 1000.0f;
                 m_Particles[i].Position += m_Particles[i].Velocity * timeStep / 1000.0f;
-                m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.4f / 1000.0f);
+                m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.5f / 1000.0f);
                 m_Particles[i].Age += timeStep / 1000.0f;
             }
             
@@ -193,9 +188,6 @@ void Scene::OnUpdate(float timeStep)
             ));
 
             m_Particles[i].Transform = glm::translate(glm::mat4x4(1.0f), m_Particles[i].Position) * rotation;
-
-            m_ShaderParticles[i].Transform = m_Particles[i].Transform;
-            m_ShaderParticles[i].Alpha = m_Particles[i].Alpha;
         }
     }
 }
@@ -353,9 +345,9 @@ const Texture& Scene::GetMirrorTexture() const
     return m_MirrorTexture;
 }
 
-std::span<const ShaderParticle> Scene::GetParticles() const
+std::span<const Particle> Scene::GetParticles() const
 {
-    return m_ShaderParticles;
+    return m_Particles;
 }
 
 Mesh Scene::LoadRobotMesh(const std::filesystem::path& path)

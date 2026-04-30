@@ -7,8 +7,10 @@ vec2 k_UVs[4] = vec2[4](vec2(0.0f, 0.0f), vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), ve
 struct Particle
 {
     mat4x4 Transform;
+    vec3 Position;
     float Alpha;
-    vec3 pad0;
+    vec3 Velocity;
+    float Age;
 };
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
