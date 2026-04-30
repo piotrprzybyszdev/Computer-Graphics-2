@@ -6,7 +6,8 @@ vec2 k_UVs[4] = vec2[4](vec2(0.0f, 0.0f), vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), ve
 
 struct Particle
 {
-    mat4x4 Transform;
+    vec3 PrevPosition;
+    float pad0;
     vec3 Position;
     float Alpha;
     vec3 Velocity;
@@ -36,11 +37,10 @@ void main()
     const float yoffset = k_YOffsets[gl_VertexIndex];
     const vec2 uv = k_UVs[gl_VertexIndex];
 
-    const mat4x4 invTransform = inverse(u_CameraView * particle.Transform);
-
-    const vec3 center = (particle.Transform * vec4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-    const vec3 xaxis = normalize((invTransform * vec4(1.0f, 0.0f, 0.0f, 0.0f)).xyz);
-    const vec3 yaxis = normalize((invTransform * vec4(0.0f, 1.0f, 0.0f, 0.0f)).xyz);
+    const vec3 center = (particle.Position + particle.PrevPosition) / 2.0f;
+    const vec3 yaxis = normalize(particle.Position - particle.PrevPosition);
+    const vec3 eye = normalize(center - u_CameraPosition.xyz);
+    const vec3 xaxis = normalize(cross(eye, yaxis));
 
     const float scaleX = 0.004f;
     const float scaleY = 0.016f;

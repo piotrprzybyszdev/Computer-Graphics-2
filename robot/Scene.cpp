@@ -40,12 +40,11 @@ Scene::Scene()
     const size_t particleCount = 500;
 
     m_Particles.resize(particleCount, Particle {
-        .Transform = glm::mat4x4(1.0f),
         .Position = glm::vec3(0.0f, 0.0f, 0.0f),
         .Alpha = 0.0f,
         .Velocity = glm::vec3(0.0f, 0.0f, 0.0f),
         .Age = 0.0f,
-		});
+	});
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -161,6 +160,7 @@ void Scene::OnUpdate(float timeStep)
                 float rand2 = dis(gen);
 
                 Particle particle {
+                    .PrevPosition = point,
                     .Position = point,
                     .Alpha = 0.5f,
                     .Velocity = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(30.0f), glm::vec3(0.0f, 0.0f, 1.0f)), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * uniformSampleHemisphere(glm::vec2(rand1, rand2)),
@@ -171,23 +171,11 @@ void Scene::OnUpdate(float timeStep)
             else
             {
                 m_Particles[i].Velocity += glm::vec3(0.0f, -1.0f, 0.0f) * timeStep / 1000.0f;
+                m_Particles[i].PrevPosition = m_Particles[i].Position;
                 m_Particles[i].Position += m_Particles[i].Velocity * timeStep / 1000.0f;
                 m_Particles[i].Alpha = glm::max(0.0f, m_Particles[i].Alpha - timeStep * 0.5f / 1000.0f);
                 m_Particles[i].Age += timeStep / 1000.0f;
             }
-            
-            glm::vec3 normal = glm::normalize(m_CameraPosition - m_Particles[i].Position);
-			glm::vec3 tangent = glm::normalize(glm::cross(m_Particles[i].Velocity, normal));
-			glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
-
-            glm::mat4 rotation = glm::transpose(glm::mat4(
-                glm::vec4(tangent, 0.0f),
-                glm::vec4(bitangent, 0.0f),
-                glm::vec4(normal, 0.0f),
-                glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
-            ));
-
-            m_Particles[i].Transform = glm::translate(glm::mat4x4(1.0f), m_Particles[i].Position) * rotation;
         }
     }
 }
