@@ -7,13 +7,13 @@
 
 #include "Scene.h"
 
-class RobotUserInterfaceState final : public ref::UserInterfaceState
+class RobotUserInterface final : public ref::UserInterface
 {
 public:
-    RobotUserInterfaceState(Scene &scene);
-    ~RobotUserInterfaceState() override = default;
+    RobotUserInterface(const ref::UserInterfaceVulkanSpec& spec, Scene &scene);
+    ~RobotUserInterface() override = default;
 
-    void OnUpdate(float timeStep) override;
+    void OnDefineUI(float timeStep) override;
     
     void OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods mods) override;
     void OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods) override;
@@ -44,8 +44,7 @@ private:
     ref::vulkan::GraphicsPipelineInstanceId m_MirrorStencilPipelineId, m_ReflectionPipelineId, m_MirrorPipelineId;
     ref::vulkan::GraphicsPipelineInstanceId m_LightingPipelineId, m_ShadowPipelineId, m_AmbientPipelineId;
 
-    std::unique_ptr<RobotUserInterfaceState> m_UserInterfaceState;
-    std::unique_ptr<ref::UserInterface> m_UserInterface;
+    std::unique_ptr<RobotUserInterface> m_UserInterface;
     std::unique_ptr<ref::vulkan::FrameGraph> m_FrameGraph;
     std::unique_ptr<ref::vulkan::Renderer> m_Renderer;
     std::unique_ptr<ref::vulkan::ResourceAllocator> m_ResourceAllocator;

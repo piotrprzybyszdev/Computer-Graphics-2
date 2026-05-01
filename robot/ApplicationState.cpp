@@ -13,25 +13,25 @@
 using namespace ref;
 using namespace ref::vulkan;
 
-RobotUserInterfaceState::RobotUserInterfaceState(Scene& scene) : m_Scene(scene)
+RobotUserInterface::RobotUserInterface(const UserInterfaceVulkanSpec& spec, Scene& scene) : UserInterface(spec), m_Scene(scene)
 {
 }
 
-void RobotUserInterfaceState::OnUpdate(float /* timeStep */)
+void RobotUserInterface::OnDefineUI(float /* timeStep */)
 {
 }
 
-void RobotUserInterfaceState::OnKeyEvent(Key key, KeyAction action, Mods mods)
+void RobotUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
 {
     m_Scene.OnKeyEvent(key, action, mods);
 }
 
-void RobotUserInterfaceState::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
+void RobotUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
 {
     m_Scene.OnMouseButtonEvent(button, action, mods);
 }
 
-void RobotUserInterfaceState::OnCursorMoveEvent(double xpos, double ypos)
+void RobotUserInterface::OnCursorMoveEvent(double xpos, double ypos)
 {
     m_Scene.OnCursorMoveEvent(xpos, ypos);
 }
@@ -247,8 +247,7 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
         .ImageFormat = vk::Format::eR8G8B8A8Unorm,
     };
 
-    m_UserInterfaceState = std::make_unique<RobotUserInterfaceState>(m_Scene);
-    m_UserInterface = std::make_unique<UserInterface>(userInterfaceSpec, *m_UserInterfaceState);
+    m_UserInterface = std::make_unique<RobotUserInterface>(userInterfaceSpec, m_Scene);
 
     FrameGraphBuilder builder;
 
@@ -622,6 +621,8 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     m_Renderer = std::make_unique<Renderer>(rendererSpec);
 
+    m_UserInterface->OnEnter();
+
     auto uploadBuffer = [&](const std::string& name, std::span<const std::byte> data) {
         assert(m_FrameGraph->GetBuffer(name).size() == 1);
         auto bufferId = m_FrameGraph->GetBuffer(name).front();
@@ -651,10 +652,10 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
 void RobotApplicationState::OnExit(vulkan::ApplicationState* /* next */)
 {
+    m_UserInterface->OnExit();
     m_Renderer.reset();
     m_FrameGraph.reset();
     m_UserInterface.reset();
-    m_UserInterfaceState.reset();
     m_ResourceAllocator.reset();
 }
 
@@ -697,10 +698,13 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
 void RobotApplicationState::OnUpdate(float timeStep)
 {
     m_UserInterface->OnUpdate(timeStep);
-    m_Renderer->OnUpdate(timeStep);
 
     m_Scene.OnUpdate(timeStep);
+}
 
+void RobotApplicationState::OnRender()
+{
+    m_Renderer->BeginFrame();
     {
         auto transforms = m_Scene.GetTransforms();
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Transform Buffer");
@@ -738,9 +742,6 @@ void RobotApplicationState::OnUpdate(float timeStep)
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Mirror Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
     }
-}
 
-void RobotApplicationState::OnRender()
-{
-    m_Renderer->OnRender();
+    m_Renderer->EndFrame();
 }
