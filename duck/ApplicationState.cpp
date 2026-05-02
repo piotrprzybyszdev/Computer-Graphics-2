@@ -1,0 +1,283 @@
+#include <imgui.h>
+#include <glm/glm.hpp>
+
+#include <Core/Core.h>
+
+#include <Vulkan/Application.h>
+#include <Vulkan/Renderer/FrameGraphBuilder.h>
+
+#include "ApplicationState.h"
+
+using namespace ref;
+using namespace ref::vulkan;
+
+DuckUserInterface::DuckUserInterface(const UserInterfaceVulkanSpec& spec, Scene& scene) : UserInterface(spec), m_Scene(scene)
+{
+}
+
+void DuckUserInterface::OnDefineUI(float /* timeStep */)
+{
+}
+
+void DuckUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
+{
+    m_Scene.OnKeyEvent(key, action, mods);
+}
+
+void DuckUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
+{
+    m_Scene.OnMouseButtonEvent(button, action, mods);
+}
+
+void DuckUserInterface::OnCursorMoveEvent(double xpos, double ypos)
+{
+    m_Scene.OnCursorMoveEvent(xpos, ypos);
+}
+
+struct CameraConstants
+{
+    glm::mat4x4 Projection;
+    glm::mat4x4 View;
+    glm::vec4 Origin;
+};
+
+DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
+    : m_MainQueue(spec.Queues.at(Application::MainQueueName))
+{
+    ShaderId meshVertexShader = spec.ShaderLibrary->GetShaderByPath("Shaders/mesh.vert");
+    ShaderId phongFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/phong.frag");
+
+    {
+        GraphicsPipelineInfo pipelineInfo = {
+            .Name = "Water Pipeline",
+            .VertexShaderId = meshVertexShader,
+            .FragmentShaderId = phongFragmentShader,
+        };
+
+        auto lPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        GraphicsPipelineInstanceInfo pipelineInstanceInfo = {
+            .Name = "Water Pipeline Instance",
+            .PipelineId = lPipelineId,
+            .BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(Vertex)) },
+            .VertexInputs = { { 0, offsetof(Vertex, Position) }, { 0, offsetof(Vertex, Normal) } },
+            .ColorAttachmentFormats = { vk::Format::eR8G8B8A8Unorm },
+            .DepthAttachmentFormat = vk::Format::eD24UnormS8Uint,
+            .StencilAttachmentFormat = vk::Format::eD24UnormS8Uint,
+        };
+
+        pipelineInstanceInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
+        pipelineInstanceInfo.RasterizationState.setLineWidth(1.0f);
+        pipelineInstanceInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eBack);
+        pipelineInstanceInfo.DepthStencilState.setDepthTestEnable(vk::True);
+        pipelineInstanceInfo.DepthStencilState.setDepthWriteEnable(vk::True);
+        pipelineInstanceInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eLess);
+        pipelineInstanceInfo.AttachmentBlendStates.emplace_back().setColorWriteMask(vk::FlagTraits<vk::ColorComponentFlagBits>::allFlags);
+        m_WaterPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
+    }
+}
+
+DuckApplicationState::~DuckApplicationState()
+{
+}
+
+void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
+{
+    const auto& spec = Application::GetInstance()->GetApplicationStateSpec();
+
+    [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipelines();
+    assert(success == true);
+
+    ResourceManagerSpec resourceManagerSpec = {
+        .ApiVersion = spec.ApiVersion,
+        .Instance = spec.Instance,
+        .PhysicalDevice = spec.PhysicalDevice,
+        .LogicalDevice = spec.LogicalDevice,
+    };
+
+    m_ResourceAllocator = std::make_unique<ResourceAllocator>(resourceManagerSpec);
+
+    const uint32_t imageCount = std::clamp(2u, spec.SwapchainBuilder->GetMinImageCount(), spec.SwapchainBuilder->GetMaxImageCount());
+    UserInterfaceVulkanSpec userInterfaceSpec = {
+        .Window = spec.ApplicationWindow->GetHandle(),
+        .ApiVersion = spec.ApiVersion,
+        .Instance = spec.Instance,
+        .PhysicalDevice = spec.PhysicalDevice,
+        .LogicalDevice = spec.LogicalDevice,
+        .QueueFamilyIndex = m_MainQueue.FamilyIndex,
+        .Queue = m_MainQueue.Handle,
+        .ImageCount = imageCount,
+        .ImageFormat = vk::Format::eR8G8B8A8Unorm,
+    };
+
+    m_UserInterface = std::make_unique<DuckUserInterface>(userInterfaceSpec, m_Scene);
+
+    FrameGraphBuilder builder;
+
+    builder.AddDeviceImage(
+        "Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1280, 720, 1), 1, 1)
+        .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), true, false
+    );
+    builder.AddDeviceImage(
+        "Depth Stencil Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eD24UnormS8Uint, vk::Extent3D(1280, 720, 1), 1, 1)
+        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), true, false
+    );
+    builder.AddDeviceBuffer("Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertices().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), false, true);
+    builder.AddDeviceBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTransforms().size_bytes()), false, true);
+
+    builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true, true);
+
+    const auto& instance = m_Scene.GetInstances()[m_Scene.GetWaterInstanceIndex()];
+    const auto& mesh = m_Scene.GetMeshes()[instance.MeshIndex];
+    IndexedGraphicsPassSpec::DrawSpec waterDraw = {
+        .Command = {
+            .IndexCount = mesh.IndexCount,
+            .InstanceCount = 1,
+            .FirstIndex = mesh.IndexOffset,
+            .VertexOffset = mesh.VertexOffset,
+            .FirstInstance = 0,
+        },
+        .PushConstantData = std::as_bytes(std::span(&instance.TransformIndex, 1)),
+    };
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = m_WaterPipeline,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Transform Buffer", 1, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Vertex Buffer" } },
+            },
+            .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                    .LoadOp = vk::AttachmentLoadOp::eClear,
+                    .ClearValue = vk::ClearColorValue(0.2f, 0.2f, 0.2f, 1.0f),
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+                .LoadOp = vk::AttachmentLoadOp::eClear,
+                .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
+            } },
+            .Draws = { waterDraw },
+        };
+        builder.AddIndexedGraphicsPass("Water Pass", passSpec);
+    }
+
+    {
+        CustomGraphicsPassSpec passSpec = {
+            .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+        };
+
+        builder.AddCustomGraphicsPass("UI Pass", passSpec);
+    }
+
+    {
+        vk::ImageSubresourceLayers layers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+
+        BlitPassSpec blitSpec = {
+            .SrcImageResource = "Image",
+            .DstImageResource = FrameGraph::g_SwapchainImageResourceName,
+            .Regions = { vk::ImageBlit2(layers, {}, layers, {}) },
+        };
+        builder.AddBlitPass("Blit Pass", blitSpec);
+    }
+
+    m_FrameGraph = builder.CreateUnique(spec.PipelineLibrary, m_ResourceAllocator.get());
+
+    RendererSpec rendererSpec = {
+        .LogicalDevice = spec.LogicalDevice,
+        .MainQueue = m_MainQueue,
+        .FrameGraph = m_FrameGraph.get(),
+        .ResourceAllocator = m_ResourceAllocator.get(),
+    };
+
+    m_Renderer = std::make_unique<Renderer>(rendererSpec);
+
+    m_UserInterface->OnEnter();
+
+    auto uploadBuffer = [&](const std::string& name, std::span<const std::byte> data) {
+        assert(m_FrameGraph->GetBuffer(name).size() == 1);
+        auto bufferId = m_FrameGraph->GetBuffer(name).front();
+        if (m_ResourceAllocator->GetBufferResource(bufferId).IsDevice)
+            m_Renderer->UploadWithStaging(bufferId, data);
+        else
+            m_ResourceAllocator->UploadToBuffer(bufferId, data.data(), data.size());
+    };
+
+    uploadBuffer("Vertex Buffer", std::as_bytes(m_Scene.GetVertices()));
+    uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetIndices()));
+    uploadBuffer("Transform Buffer", std::as_bytes(m_Scene.GetTransforms()));
+}
+
+void DuckApplicationState::OnExit(vulkan::ApplicationState* /* next */)
+{
+    m_UserInterface->OnExit();
+    m_Renderer.reset();
+    m_FrameGraph.reset();
+    m_UserInterface.reset();
+    m_ResourceAllocator.reset();
+}
+
+void DuckApplicationState::OnResize(const Swapchain* swapchain)
+{
+    m_Renderer->OnResize(swapchain);
+
+    const vk::Extent2D extent = swapchain->GetExtent();
+    m_Scene.OnResize(extent.width, extent.height);
+
+    m_FrameGraph->ModifyImage("Image").Info.setExtent(vk::Extent3D(extent, 1));
+    m_FrameGraph->UpdateImage("Image");
+
+    m_FrameGraph->ModifyImage("Depth Stencil Image").Info.setExtent(vk::Extent3D(extent, 1));
+    m_FrameGraph->UpdateImage("Depth Stencil Image");
+
+    auto resizeGraphicsPass = [&](auto config) {
+        config.GetScissors() = { vk::Rect2D(vk::Offset2D(0, 0), extent) };
+        config.GetViewports() = { vk::Viewport(0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1) };
+        config.GetRenderArea().extent = extent;
+    };
+
+    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Water Pass"));
+
+    std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
+
+    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetSrcOffsets().front() = offsets;
+    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetDstOffsets().front() = offsets;
+
+    m_FrameGraph->GetCustomGraphicsPassDynamicConfig("UI Pass").GetRenderArea().extent = swapchain->GetExtent();
+}
+
+void DuckApplicationState::OnUpdate(float timeStep)
+{
+    m_UserInterface->OnUpdate(timeStep);
+
+    m_Scene.OnUpdate(timeStep);
+}
+
+void DuckApplicationState::OnRender()
+{
+    m_Renderer->BeginFrame();
+
+    {
+        CameraConstants camera = {
+            .Projection = m_Scene.GetCameraProjection(),
+            .View = m_Scene.GetCameraView(),
+            .Origin = m_Scene.GetCameraOrigin(),
+        };
+        auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
+        m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
+    }
+
+    m_Renderer->EndFrame();
+}
