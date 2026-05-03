@@ -16,10 +16,11 @@ layout(push_constant) uniform PushConstants {
 
 layout (location = 0) in vec4 v_Position;
 layout (location = 1) in vec4 v_Normal;
+layout (location = 2) in vec2 v_TexCoord;
 
 layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec4 o_Normal;
-layout (location = 2) out vec4 o_Color;
+layout (location = 2) out vec2 o_TexCoord;
 
 void main()
 {
@@ -27,7 +28,7 @@ void main()
 
     o_Position = transform * vec4(v_Position.xyz, 1.0f);
     o_Normal = transform * vec4(v_Normal.xyz, 0.0f);
-    o_Color = vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    o_TexCoord = v_TexCoord;
 
     gl_Position = u_CameraProjection * u_CameraView * o_Position;
 }

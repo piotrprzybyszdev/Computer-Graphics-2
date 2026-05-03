@@ -1,9 +1,10 @@
+#include <glm/glm.hpp>
+
 #include <Core/UserInterface.h>
 
 #include <Vulkan/ApplicationState.h>
 
 #include <memory>
-#include <vector>
 
 #include "Scene.h"
 
@@ -40,6 +41,7 @@ public:
 private:
     ref::vulkan::Queue m_MainQueue;
 
+    ref::vulkan::ComputePipelineInstanceId m_WaterHeightPipeline, m_WaterNormalPipeline;
     ref::vulkan::GraphicsPipelineInstanceId m_WaterPipeline;
 
     std::unique_ptr<DuckUserInterface> m_UserInterface;
@@ -48,4 +50,11 @@ private:
     std::unique_ptr<ref::vulkan::ResourceAllocator> m_ResourceAllocator;
 
     Scene m_Scene;
+
+    struct SimulationData
+    {
+        glm::uint InputBufferIndex = 0;
+        glm::uint Disturb = 0;
+        glm::ivec2 DisturbCoord = glm::ivec2(0, 0);
+    } m_SimulationData;
 };

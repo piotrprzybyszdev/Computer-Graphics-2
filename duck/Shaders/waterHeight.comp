@@ -1,0 +1,76 @@
+#version 460
+
+layout(set = 0, binding = 0) buffer WaterHeightBuffer0 {
+    float s_WaterHeight0[256 * 256];
+};
+
+layout(set = 0, binding = 1) buffer WaterHeightBuffer1 {
+    float s_WaterHeight1[256 * 256];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint pc_InputBufferIndex;
+    uint pc_Disturb;
+    ivec2 pc_DisturbCoord;
+};
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+float loadHeight(ivec2 imageCoords, bool inputBuffer)
+{
+    if (imageCoords.x < 0 || imageCoords.y < 0 || imageCoords.x > 255 || imageCoords.y > 255)
+        return 0;
+
+    bool buffer0 = pc_InputBufferIndex == 0;
+    if (!inputBuffer)
+        buffer0 = !buffer0;
+
+    const uint idx = imageCoords.y * 255 + imageCoords.x;
+    if (buffer0)
+        return s_WaterHeight0[idx];
+    else
+        return s_WaterHeight1[idx];
+}
+
+void storeHeight(ivec2 imageCoords, float value)
+{
+    if (imageCoords.x < 0 || imageCoords.y < 0 || imageCoords.x > 255 || imageCoords.y > 255)
+        return;
+
+    const uint idx = imageCoords.y * 255 + imageCoords.x;
+    if (pc_InputBufferIndex == 0)
+        s_WaterHeight1[idx] = value;
+    else
+        s_WaterHeight0[idx] = value;
+}
+
+void main()
+{
+    const ivec2 imageCoords = ivec2(gl_GlobalInvocationID.xy);
+
+    const uint N = 256;
+    const float h = 2.0f / (N - 1);
+    const float c = 1.0f;
+    const float deltaT = 1.0f / N;
+    
+    const float minX = min(imageCoords.x + 0.5f, N - imageCoords.x - 0.5f);
+    const float minY = min(imageCoords.y + 0.5f, N - imageCoords.y - 0.5f);
+    const float l = (min(minX, minY) / N) * 2.0f;
+    const float d = 0.95f * min(1.0f, l / 0.2f);
+
+    const float A = (c * c * deltaT * deltaT) / (h * h);
+    const float B = 2.0f - 4.0f * A;
+    
+    const float zij0 = loadHeight(imageCoords, false);
+    const float zij1 = loadHeight(imageCoords, true);
+    const float zsum = loadHeight(ivec2(imageCoords.x - 1, imageCoords.y), true) +
+                       loadHeight(ivec2(imageCoords.x + 1, imageCoords.y), true) +
+                       loadHeight(ivec2(imageCoords.x, imageCoords.y - 1), true) +
+                       loadHeight(ivec2(imageCoords.x, imageCoords.y + 1), true);
+
+    float z = d * (A * zsum + B * zij1 - zij0);
+    if (pc_Disturb != 0 && pc_DisturbCoord == imageCoords)
+        z += 0.25f;
+
+    storeHeight(imageCoords, z);
+}

@@ -94,10 +94,10 @@ Mesh Scene::CreateUnitSquareMesh()
         .IndexOffset = static_cast<uint32_t>(m_Indices.size()),
     };
 
-    m_Vertices.emplace_back(glm::vec4(- 1, -1, 0, 1), glm::vec4(0, 0, 1, 0));
-    m_Vertices.emplace_back(glm::vec4(1, -1, 0, 1), glm::vec4(0, 0, 1, 0));
-    m_Vertices.emplace_back(glm::vec4(1, 1, 0, 1), glm::vec4(0, 0, 1, 0));
-    m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 0));
+    m_Vertices.emplace_back(glm::vec4(1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 1));
     m_Indices.append_range(std::array<uint32_t, 3>{ 0, 1, 2 });
     m_Indices.append_range(std::array<uint32_t, 3>{ 2, 3, 0 });
 

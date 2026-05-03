@@ -44,8 +44,40 @@ struct CameraConstants
 DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
     : m_MainQueue(spec.Queues.at(Application::MainQueueName))
 {
+    ShaderId waterHeightShader = spec.ShaderLibrary->GetShaderByPath("Shaders/waterHeight.comp");
+    ShaderId waterNormalShader = spec.ShaderLibrary->GetShaderByPath("Shaders/waterNormal.comp");
     ShaderId meshVertexShader = spec.ShaderLibrary->GetShaderByPath("Shaders/mesh.vert");
     ShaderId phongFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/phong.frag");
+
+    {
+        ComputePipelineInfo pipelineInfo = {
+            .Name = "Water Height Pipeline",
+            .ComputeShader = waterHeightShader,
+        };
+
+        auto heightPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo = {
+            .Name = "Water Normal Pipeline",
+            .ComputeShader = waterNormalShader,
+        };
+
+        auto normalPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        ComputePipelineInstanceInfo pipelineInstanceInfo = {
+            .Name = "Water Height Pipeline Instance",
+            .PipelineId = heightPipelineId,
+        };
+
+        m_WaterHeightPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
+
+        pipelineInstanceInfo = {
+            .Name = "Water Normal Pipeline Instance",
+            .PipelineId = normalPipelineId,
+        };
+
+        m_WaterNormalPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
+    }
 
     {
         GraphicsPipelineInfo pipelineInfo = {
@@ -54,13 +86,13 @@ DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
             .FragmentShaderId = phongFragmentShader,
         };
 
-        auto lPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+        auto pipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
 
         GraphicsPipelineInstanceInfo pipelineInstanceInfo = {
             .Name = "Water Pipeline Instance",
-            .PipelineId = lPipelineId,
+            .PipelineId = pipelineId,
             .BindingDescriptions = { vk::VertexInputBindingDescription(0, sizeof(Vertex)) },
-            .VertexInputs = { { 0, offsetof(Vertex, Position) }, { 0, offsetof(Vertex, Normal) } },
+            .VertexInputs = { { 0, offsetof(Vertex, Position) }, { 0, offsetof(Vertex, Normal) }, { 0, offsetof(Vertex, TexCoord) } },
             .ColorAttachmentFormats = { vk::Format::eR8G8B8A8Unorm },
             .DepthAttachmentFormat = vk::Format::eD24UnormS8Uint,
             .StencilAttachmentFormat = vk::Format::eD24UnormS8Uint,
@@ -116,37 +148,88 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     builder.AddDeviceImage(
         "Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1280, 720, 1), 1, 1)
-        .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), true, false
+        .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), ResourceType::Transient, true
     );
     builder.AddDeviceImage(
         "Depth Stencil Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eD24UnormS8Uint, vk::Extent3D(1280, 720, 1), 1, 1)
-        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), true, false
+        .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), ResourceType::Transient, true
     );
-    builder.AddDeviceBuffer("Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertices().size_bytes()), false, true);
-    builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), false, true);
-    builder.AddDeviceBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTransforms().size_bytes()), false, true);
+    builder.AddDeviceImage(
+        "Water Normal Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(256, 256, 1), 1, 1)
+        .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled), ResourceType::Transient, true
+    );
 
-    builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), true, true);
+    builder.AddDeviceBuffer("Water Height Buffer 0", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
+    builder.AddDeviceBuffer("Water Height Buffer 1", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
+    builder.AddDeviceBuffer("Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertices().size_bytes()), ResourceType::Persistent, false);
+    builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), ResourceType::Persistent, false);
+    builder.AddDeviceBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTransforms().size_bytes()), ResourceType::Persistent, false);
 
-    const auto& instance = m_Scene.GetInstances()[m_Scene.GetWaterInstanceIndex()];
-    const auto& mesh = m_Scene.GetMeshes()[instance.MeshIndex];
-    IndexedGraphicsPassSpec::DrawSpec waterDraw = {
-        .Command = {
-            .IndexCount = mesh.IndexCount,
-            .InstanceCount = 1,
-            .FirstIndex = mesh.IndexOffset,
-            .VertexOffset = mesh.VertexOffset,
-            .FirstInstance = 0,
-        },
-        .PushConstantData = std::as_bytes(std::span(&instance.TransformIndex, 1)),
-    };
+    builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), ResourceType::Persistent, true);
 
     {
+        ComputePassSpec passSpec = {
+            .Pipeline = m_WaterHeightPipeline,
+            .BufferBindings = {
+                { "Water Height Buffer 0", 0, true, true },
+                { "Water Height Buffer 1", 1, true, true },
+            },
+            .Dispatches = { 
+                {
+                    .Command = { 256 / 8, 256 / 8, 1 },
+                    .PushConstantData = std::as_bytes(std::span(&m_SimulationData, 1)),
+                }
+            },
+        };
+
+        builder.AddComputePass("Water Height Pass", passSpec);
+    }
+
+    {
+        ComputePassSpec passSpec = {
+            .Pipeline = m_WaterNormalPipeline,
+            .BufferBindings = {
+                { "Water Height Buffer 0", 0, true, true },
+                { "Water Height Buffer 1", 1, true, true },
+            },
+            .ImageBindings = {
+                { "Water Normal Image", 2, nullptr, false, true },
+            },
+            .Dispatches = {
+                {
+                    .Command = { 256 / 8, 256 / 8, 1 },
+                    .PushConstantData = std::as_bytes(std::span(&m_SimulationData.InputBufferIndex, 1)),
+                }
+            },
+        };
+
+        builder.AddComputePass("Water Normal Pass", passSpec);
+    }
+
+    {
+        auto sampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
+
+        const auto& instance = m_Scene.GetInstances()[m_Scene.GetWaterInstanceIndex()];
+        const auto& mesh = m_Scene.GetMeshes()[instance.MeshIndex];
+        IndexedGraphicsPassSpec::DrawSpec waterDraw = {
+            .Command = {
+                .IndexCount = mesh.IndexCount,
+                .InstanceCount = 1,
+                .FirstIndex = mesh.IndexOffset,
+                .VertexOffset = mesh.VertexOffset,
+                .FirstInstance = 0,
+            },
+            .PushConstantData = std::as_bytes(std::span(&instance.TransformIndex, 1)),
+        };
+
         IndexedGraphicsPassSpec passSpec = {
             .Pipeline = m_WaterPipeline,
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
                 { "Transform Buffer", 1, true, false },
+            },
+            .ImageBindings = {
+                { "Water Normal Image", 2, sampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },
@@ -218,6 +301,15 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     uploadBuffer("Vertex Buffer", std::as_bytes(m_Scene.GetVertices()));
     uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetIndices()));
     uploadBuffer("Transform Buffer", std::as_bytes(m_Scene.GetTransforms()));
+
+    auto clearBuffer = [&](const std::string& name) {
+        assert(m_FrameGraph->GetBuffer(name).size() == 1);
+        auto bufferId = m_FrameGraph->GetBuffer(name).front();
+        m_Renderer->FillBuffer(bufferId, 0, vk::WholeSize, 0);
+    };
+
+    clearBuffer("Water Height Buffer 0");
+    clearBuffer("Water Height Buffer 1");
 }
 
 void DuckApplicationState::OnExit(vulkan::ApplicationState* /* next */)
@@ -236,11 +328,13 @@ void DuckApplicationState::OnResize(const Swapchain* swapchain)
     const vk::Extent2D extent = swapchain->GetExtent();
     m_Scene.OnResize(extent.width, extent.height);
 
-    m_FrameGraph->ModifyImage("Image").Info.setExtent(vk::Extent3D(extent, 1));
-    m_FrameGraph->UpdateImage("Image");
+    auto resizeImage = [&](const std::string& name) {
+        m_FrameGraph->ModifyImage(name).Info.setExtent(vk::Extent3D(extent, 1));
+        m_FrameGraph->UpdateImage(name);
+    };
 
-    m_FrameGraph->ModifyImage("Depth Stencil Image").Info.setExtent(vk::Extent3D(extent, 1));
-    m_FrameGraph->UpdateImage("Depth Stencil Image");
+    resizeImage("Image");
+    resizeImage("Depth Stencil Image");
 
     auto resizeGraphicsPass = [&](auto config) {
         config.GetScissors() = { vk::Rect2D(vk::Offset2D(0, 0), extent) };
@@ -263,6 +357,10 @@ void DuckApplicationState::OnUpdate(float timeStep)
     m_UserInterface->OnUpdate(timeStep);
 
     m_Scene.OnUpdate(timeStep);
+
+    m_SimulationData.InputBufferIndex = m_SimulationData.InputBufferIndex == 0 ? 1 : 0;
+    m_SimulationData.Disturb = true;
+    m_SimulationData.DisturbCoord = glm::ivec2(rand() % 256, rand() % 256);
 }
 
 void DuckApplicationState::OnRender()
