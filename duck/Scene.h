@@ -58,6 +58,9 @@ public:
     std::span<const Instance> GetInstances() const;
 
     uint32_t GetWaterInstanceIndex() const;
+    uint32_t GetDuckInstanceIndex() const;
+
+    const Texture& GetDuckTexture() const;
 
 private:
     struct Camera
@@ -74,8 +77,12 @@ private:
     std::vector<glm::mat4x4> m_Transforms;
 
     std::vector<Instance> m_Instances;
+
+    Texture m_DuckTexture;
     
 private:
     Mesh CreateUnitSquareMesh();
+    Mesh LoadMesh(const std::filesystem::path &path);
+
     Texture LoadTexture(const std::filesystem::path& path);
 };

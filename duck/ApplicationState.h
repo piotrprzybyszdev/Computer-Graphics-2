@@ -42,7 +42,7 @@ private:
     ref::vulkan::Queue m_MainQueue;
 
     ref::vulkan::ComputePipelineInstanceId m_WaterHeightPipeline, m_WaterNormalPipeline;
-    ref::vulkan::GraphicsPipelineInstanceId m_WaterPipeline;
+    ref::vulkan::GraphicsPipelineInstanceId m_WaterPipeline, m_DuckPipeline;
 
     std::unique_ptr<DuckUserInterface> m_UserInterface;
     std::unique_ptr<ref::vulkan::FrameGraph> m_FrameGraph;
@@ -57,4 +57,6 @@ private:
         glm::uint Disturb = 0;
         glm::ivec2 DisturbCoord = glm::ivec2(0, 0);
     } m_SimulationData;
+
+    vk::Sampler m_TextureSampler;
 };

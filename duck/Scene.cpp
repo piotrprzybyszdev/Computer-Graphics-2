@@ -4,6 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <fstream>
 #include <ranges>
 #include <vector>
 
@@ -12,10 +13,16 @@
 Scene::Scene()
 {
     m_Meshes.push_back(CreateUnitSquareMesh());
+    m_Meshes.push_back(LoadMesh("assets/duck/duck.txt"));
 
     // Water
     m_Transforms.push_back(glm::rotate(glm::mat4x4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
     m_Instances.push_back(Instance(0, 0));
+
+    // Duck
+    m_Transforms.push_back(glm::scale(glm::mat4x4(1.0f), glm::vec3(0.002f)));
+    m_Instances.push_back(Instance(1, 1));
+    m_DuckTexture = LoadTexture("assets/duck/ducktex.jpg");
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -26,7 +33,7 @@ void Scene::OnResize(uint32_t width, uint32_t height)
 void Scene::OnUpdate(float /* timeStep */)
 {
     const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
-    m_Camera.Origin = glm::vec4(0.0f, 2.0f, 3.0f, 1.0f);
+    m_Camera.Origin = glm::vec4(0.0f, 1.0f, 2.0f, 1.0f);
     m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), up);
 }
 
@@ -87,6 +94,16 @@ uint32_t Scene::GetWaterInstanceIndex() const
     return 0;
 }
 
+uint32_t Scene::GetDuckInstanceIndex() const
+{
+    return 1;
+}
+
+const Texture& Scene::GetDuckTexture() const
+{
+    return m_DuckTexture;
+}
+
 Mesh Scene::CreateUnitSquareMesh()
 {
     Mesh mesh = {
@@ -100,6 +117,39 @@ Mesh Scene::CreateUnitSquareMesh()
     m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 1));
     m_Indices.append_range(std::array<uint32_t, 3>{ 0, 1, 2 });
     m_Indices.append_range(std::array<uint32_t, 3>{ 2, 3, 0 });
+
+    mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
+    mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;
+
+    return mesh;
+}
+
+Mesh Scene::LoadMesh(const std::filesystem::path& path)
+{
+    Mesh mesh = {
+        .VertexOffset = static_cast<uint32_t>(m_Vertices.size()),
+        .IndexOffset = static_cast<uint32_t>(m_Indices.size()),
+    };
+
+    std::ifstream file(path, std::ios::in);
+    assert(file.is_open());
+
+    uint32_t v;
+    file >> v;
+
+    for (uint32_t i = 0; i < v; i++)
+    {
+        Vertex &vertex = m_Vertices.emplace_back();
+        file >> vertex.Position.x >> vertex.Position.y >> vertex.Position.z;
+        file >> vertex.Normal.x >> vertex.Normal.y >> vertex.Normal.z;
+        file >> vertex.TexCoord.x >> vertex.TexCoord.y;
+    }
+
+    uint32_t t;
+    file >> t;
+
+    for (uint32_t i = 0; i < t * 3; i++)
+        file >> m_Indices.emplace_back();
 
     mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
     mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;

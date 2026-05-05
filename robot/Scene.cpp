@@ -17,7 +17,7 @@
 Scene::Scene()
 {
     for (int i = 0; i < 6; i++)
-        m_Meshes.Meshes.push_back(LoadRobotMesh(std::format("assets/puma/mesh{}.txt", i + 1)));
+        m_Meshes.Meshes.push_back(LoadRobotMesh(std::format("assets/robot/puma/mesh{}.txt", i + 1)));
     m_Meshes.Transforms.resize(6, glm::mat4x4(1.0f));
 
     m_Meshes.Meshes.push_back(CreateCylinderMesh(1.0f, 10.0f, 10, 3));
@@ -34,8 +34,8 @@ Scene::Scene()
 
     m_Lights.push_back(Light(glm::vec4(-1.5f, 1.0f, 1.0f, 1.0f)));
 
-    m_SparkTexture = LoadTexture("assets/spark.png");
-    m_MirrorTexture = LoadTexture("assets/mirror.png");
+    m_SparkTexture = LoadTexture("assets/robot/spark.png");
+    m_MirrorTexture = LoadTexture("assets/robot/mirror.png");
 
     const size_t particleCount = 500;
 
