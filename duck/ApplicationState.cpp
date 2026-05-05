@@ -178,8 +178,8 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     builder.AddDeviceBuffer("Water Height Buffer 1", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
     builder.AddDeviceBuffer("Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertices().size_bytes()), ResourceType::Persistent, false);
     builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), ResourceType::Persistent, false);
-    builder.AddDeviceBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(m_Scene.GetTransforms().size_bytes()), ResourceType::Persistent, false);
-
+    
+    builder.AddHostBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetTransforms().size_bytes()), ResourceType::Persistent, true);
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), ResourceType::Persistent, true);
 
     {
@@ -357,7 +357,6 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     uploadBuffer("Vertex Buffer", std::as_bytes(m_Scene.GetVertices()));
     uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetIndices()));
-    uploadBuffer("Transform Buffer", std::as_bytes(m_Scene.GetTransforms()));
 
     auto clearBuffer = [&](const std::string& name) {
         assert(m_FrameGraph->GetBuffer(name).size() == 1);
@@ -441,6 +440,12 @@ void DuckApplicationState::OnRender()
         };
         auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
         m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
+    }
+
+    {
+        const auto& transforms = m_Scene.GetTransforms();
+        auto bufferId = m_FrameGraph->GetCurrentBuffer("Transform Buffer");
+        m_ResourceAllocator->UploadToBuffer(bufferId, transforms.data(), transforms.size_bytes(), 0);
     }
 
     m_Renderer->EndFrame();

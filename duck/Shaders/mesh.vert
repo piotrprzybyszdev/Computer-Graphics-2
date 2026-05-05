@@ -6,8 +6,8 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     vec4 u_CameraOrigin;
 };
 
-layout(set = 0, binding = 1) readonly buffer TransformBuffer {
-    mat4x4 s_Transforms[];
+layout(set = 0, binding = 1) uniform TransformBuffer {
+    mat4x4 u_Transforms[2];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -24,7 +24,7 @@ layout (location = 2) out vec2 o_TexCoord;
 
 void main()
 {
-    const mat4x4 transform = s_Transforms[pc_TransformIndex];
+    const mat4x4 transform = u_Transforms[pc_TransformIndex];
 
     o_Position = transform * vec4(v_Position.xyz, 1.0f);
     o_Normal = transform * vec4(v_Normal.xyz, 0.0f);

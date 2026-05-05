@@ -2,7 +2,9 @@
 
 #include <Core/UserInterface.h>
 
+#include <array>
 #include <filesystem>
+#include <random>
 #include <span>
 
 struct Vertex
@@ -79,7 +81,17 @@ private:
     std::vector<Instance> m_Instances;
 
     Texture m_DuckTexture;
+
+    struct Curve
+    {
+        inline static float s_MaxTime = 1.0f;
+
+        float ElapsedTime = 0.0f;
+        std::array<glm::vec2, 4> Points = {};
+    } m_Curve;
     
+    std::mt19937 m_Rng;
+
 private:
     Mesh CreateUnitSquareMesh();
     Mesh LoadMesh(const std::filesystem::path &path);
