@@ -18,17 +18,18 @@ void main()
 {
     const vec3 lightPosition = u_CameraOrigin.xyz;
 
-    const vec3 N = normalize(v_Normal.xyz);
+    const vec3 normal = 2.0f * texture(u_WaterNormal, v_TexCoord).rgb - 1.0f;
+
+    const vec3 N = normalize(normal);
     const vec3 L = normalize(lightPosition - v_Position.xyz);
     const vec3 V = normalize(u_CameraOrigin.xyz - v_Position.xyz);
     const vec3 R = normalize(reflect(-L, N));
     
-    const float ka = 0.2f, kd = 0.5f, ks = 0.5f, m = 100.0f;
+    const float ka = 0.2f, kd = 0.8f, ks = 0.5f, m = 100.0f;
 
     const float diffuse = max(dot(N, L), 0.0f);
     const float specular = pow(max(dot(R, V), 0.0f), m);
 
-    const vec3 color = texture(u_WaterNormal, v_TexCoord).rgb;
-
-    o_FragColor = vec4(color, 1.0f);  // vec4(color * vec3(ka + kd * diffuse + ks * specular), 1.0f);
+    const vec3 color = vec3(0.47f, 0.91f, 0.90f);
+    o_FragColor = vec4(color * vec3(ka + kd * diffuse + ks * specular), 1.0f);
 }

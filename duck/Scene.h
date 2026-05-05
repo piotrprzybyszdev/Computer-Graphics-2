@@ -4,6 +4,7 @@
 
 #include <array>
 #include <filesystem>
+#include <optional>
 #include <random>
 #include <span>
 
@@ -64,6 +65,9 @@ public:
 
     const Texture& GetDuckTexture() const;
 
+    std::optional<glm::vec2> GetDisturbance() const;
+    glm::vec2 GetDuckDisturbance() const;
+
 private:
     struct Camera
     {
@@ -91,6 +95,9 @@ private:
     } m_Curve;
     
     std::mt19937 m_Rng;
+
+    std::optional<glm::vec2> m_Disturbance;
+    glm::vec2 m_DuckDisturbance;
 
 private:
     Mesh CreateUnitSquareMesh();

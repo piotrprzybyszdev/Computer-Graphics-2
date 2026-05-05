@@ -54,8 +54,9 @@ private:
     struct SimulationData
     {
         glm::uint InputBufferIndex = 0;
-        glm::uint Disturb = 0;
-        glm::ivec2 DisturbCoord = glm::ivec2(0, 0);
+        glm::uint HasDisturb = 0;
+        glm::vec2 Disturb = glm::vec2(0, 0);
+        glm::vec2 DuckDisturb = glm::vec2(0, 0);
     } m_SimulationData;
 
     vk::Sampler m_TextureSampler;

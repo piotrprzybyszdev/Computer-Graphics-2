@@ -424,8 +424,10 @@ void DuckApplicationState::OnUpdate(float timeStep)
     m_Scene.OnUpdate(timeStep);
 
     m_SimulationData.InputBufferIndex = m_SimulationData.InputBufferIndex == 0 ? 1 : 0;
-    m_SimulationData.Disturb = true;
-    m_SimulationData.DisturbCoord = glm::ivec2(rand() % 256, rand() % 256);
+    m_SimulationData.HasDisturb = m_Scene.GetDisturbance().has_value();
+    if (m_Scene.GetDisturbance().has_value())
+        m_SimulationData.Disturb = m_Scene.GetDisturbance().value();
+    m_SimulationData.DuckDisturb = m_Scene.GetDuckDisturbance();
 }
 
 void DuckApplicationState::OnRender()

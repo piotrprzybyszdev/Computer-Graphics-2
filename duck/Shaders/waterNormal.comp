@@ -48,5 +48,5 @@ void main()
         normalize(vec3(0.0f, diffTangent, diffY))
     ));
 
-    imageStore(u_WaterNormal, imageCoords, vec4(normal, 1.0f));
+    imageStore(u_WaterNormal, imageCoords, vec4((normal + 1.0f) / 2.0f, 1.0f));
 }

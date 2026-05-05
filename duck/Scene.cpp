@@ -37,37 +37,54 @@ void Scene::OnResize(uint32_t width, uint32_t height)
 void Scene::OnUpdate(float timeStep)
 {
     // camera
-    const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
-    m_Camera.Origin = glm::vec4(0.0f, 1.0f, 2.0f, 1.0f);
-    m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), up);
-
-    // duck
-    m_Curve.ElapsedTime += timeStep / 5000;
-    if (m_Curve.ElapsedTime > Curve::s_MaxTime)
     {
-        m_Curve.ElapsedTime = 0.0f;
-        std::uniform_real_distribution dist(-1.0f, 1.0f);
-        for (int i = 0; i < 3; i++)
-            m_Curve.Points[i] = m_Curve.Points[i + 1];
-        m_Curve.Points[3] = glm::vec2(dist(m_Rng), dist(m_Rng));
+        const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+        m_Camera.Origin = glm::vec4(0.0f, 1.0f, 2.0f, 1.0f);
+        m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), up);
     }
 
-    const float t = m_Curve.ElapsedTime / Curve::s_MaxTime;
-    const glm::vec2 pos = glm::vec2(1.0f / 6.0f) * (
-        (-m_Curve.Points[0] + 3.0f * m_Curve.Points[1] - 3.0f * m_Curve.Points[2] + m_Curve.Points[3]) * t * t * t +
-        (3.0f * m_Curve.Points[0] - 6.0f * m_Curve.Points[1] + 3.0f * m_Curve.Points[2]) * t * t +
-        (-3.0f * m_Curve.Points[0] + 3.0f * m_Curve.Points[2]) * t +
-        (m_Curve.Points[0] + 4.0f * m_Curve.Points[1] + m_Curve.Points[2])
-    );
-    const glm::vec2 deriv = glm::vec2(1.0f / 6.0f) * (
-        (-m_Curve.Points[0] + 3.0f * m_Curve.Points[1] - 3.0f * m_Curve.Points[2] + m_Curve.Points[3]) * 3.0f * t * t +
-        (3.0f * m_Curve.Points[0] - 6.0f * m_Curve.Points[1] + 3.0f * m_Curve.Points[2]) * 2.0f * t +
-        (-3.0f * m_Curve.Points[0] + 3.0f * m_Curve.Points[2])
-    );
+    // disturbance
+    {
+        std::uniform_int_distribution intDist(0, 10);
+        if (intDist(m_Rng) == 0)
+        {
+            std::uniform_real_distribution dist(-1.0f, 1.0f);
+            m_Disturbance = glm::vec2(dist(m_Rng), dist(m_Rng));
+        }
+        else
+            m_Disturbance = std::nullopt;
+    }
 
-    const float alpha = std::atan2(0.0f, -1.0f) - std::atan2(deriv.y, deriv.x);
+    // duck
+    {
+        m_Curve.ElapsedTime += timeStep / 5000;
+        if (m_Curve.ElapsedTime > Curve::s_MaxTime)
+        {
+            m_Curve.ElapsedTime = 0.0f;
+            std::uniform_real_distribution dist(-1.0f, 1.0f);
+            for (int i = 0; i < 3; i++)
+                m_Curve.Points[i] = m_Curve.Points[i + 1];
+            m_Curve.Points[3] = glm::vec2(dist(m_Rng), dist(m_Rng));
+        }
 
-    m_Transforms[m_Instances[GetDuckInstanceIndex()].TransformIndex] = glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(pos.x, 0.0f, pos.y)), alpha, glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.002f));
+        const float t = m_Curve.ElapsedTime / Curve::s_MaxTime;
+        const glm::vec2 pos = glm::vec2(1.0f / 6.0f) * (
+            (-m_Curve.Points[0] + 3.0f * m_Curve.Points[1] - 3.0f * m_Curve.Points[2] + m_Curve.Points[3]) * t * t * t +
+            (3.0f * m_Curve.Points[0] - 6.0f * m_Curve.Points[1] + 3.0f * m_Curve.Points[2]) * t * t +
+            (-3.0f * m_Curve.Points[0] + 3.0f * m_Curve.Points[2]) * t +
+            (m_Curve.Points[0] + 4.0f * m_Curve.Points[1] + m_Curve.Points[2])
+            );
+        const glm::vec2 deriv = glm::vec2(1.0f / 6.0f) * (
+            (-m_Curve.Points[0] + 3.0f * m_Curve.Points[1] - 3.0f * m_Curve.Points[2] + m_Curve.Points[3]) * 3.0f * t * t +
+            (3.0f * m_Curve.Points[0] - 6.0f * m_Curve.Points[1] + 3.0f * m_Curve.Points[2]) * 2.0f * t +
+            (-3.0f * m_Curve.Points[0] + 3.0f * m_Curve.Points[2])
+            );
+
+        const float alpha = std::atan2(0.0f, -1.0f) - std::atan2(deriv.y, deriv.x);
+
+        m_DuckDisturbance = pos;
+        m_Transforms[m_Instances[GetDuckInstanceIndex()].TransformIndex] = glm::scale(glm::rotate(glm::translate(glm::mat4x4(1.0f), glm::vec3(pos.x, 0.0f, pos.y)), alpha, glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(0.002f));
+    }
 }
 
 void Scene::OnKeyEvent(ref::Key /* key */, ref::KeyAction /* action */, ref::Mods /* mods */)
@@ -137,6 +154,16 @@ const Texture& Scene::GetDuckTexture() const
     return m_DuckTexture;
 }
 
+std::optional<glm::vec2> Scene::GetDisturbance() const
+{
+    return m_Disturbance;
+}
+
+glm::vec2 Scene::GetDuckDisturbance() const
+{
+    return m_DuckDisturbance;
+}
+
 Mesh Scene::CreateUnitSquareMesh()
 {
     Mesh mesh = {
@@ -144,10 +171,10 @@ Mesh Scene::CreateUnitSquareMesh()
         .IndexOffset = static_cast<uint32_t>(m_Indices.size()),
     };
 
-    m_Vertices.emplace_back(glm::vec4(-1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 0));
-    m_Vertices.emplace_back(glm::vec4(1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 0));
-    m_Vertices.emplace_back(glm::vec4(1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 1));
-    m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(-1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, -1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 0));
     m_Indices.append_range(std::array<uint32_t, 3>{ 0, 1, 2 });
     m_Indices.append_range(std::array<uint32_t, 3>{ 2, 3, 0 });
 

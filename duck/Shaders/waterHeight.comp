@@ -10,8 +10,9 @@ layout(set = 0, binding = 1) buffer WaterHeightBuffer1 {
 
 layout(push_constant) uniform PushConstants {
     uint pc_InputBufferIndex;
-    uint pc_Disturb;
-    ivec2 pc_DisturbCoord;
+    uint pc_HasDisturb;
+    vec2 pc_Disturb;
+    vec2 pc_DuckDisturb;
 };
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -68,8 +69,10 @@ void main()
                        loadHeight(ivec2(imageCoords.x, imageCoords.y - 1), true) +
                        loadHeight(ivec2(imageCoords.x, imageCoords.y + 1), true);
 
+    const ivec2 disturbCoord = ivec2((pc_Disturb + 1.0f) / 2.0f * 255.0f);
+    const ivec2 duckDisturbCoord = ivec2((pc_DuckDisturb + 1.0f) / 2.0f * 255.0f);
     float z = d * (A * zsum + B * zij1 - zij0);
-    if (pc_Disturb != 0 && pc_DisturbCoord == imageCoords)
+    if ((pc_HasDisturb != 0 && disturbCoord == imageCoords) || duckDisturbCoord == imageCoords)
         z += 0.25f;
 
     storeHeight(imageCoords, z);
