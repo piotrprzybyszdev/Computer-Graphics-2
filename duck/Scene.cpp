@@ -14,6 +14,7 @@ Scene::Scene()
 {
     m_Meshes.push_back(CreateUnitSquareMesh());
     m_Meshes.push_back(LoadMesh("assets/duck/duck.txt"));
+    m_Meshes.push_back(CreateUnitCubeMesh());
 
     // Water
     m_Transforms.push_back(glm::rotate(glm::mat4x4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
@@ -27,6 +28,17 @@ Scene::Scene()
     std::uniform_real_distribution dist(-1.0f, 1.0f);
     for (int i = 0; i < 4; i++)
         m_Curve.Points[i] = glm::vec2(dist(m_Rng), dist(m_Rng));
+
+    // Environment
+    m_Transforms.push_back(glm::mat4x4(1.0f));
+    m_Instances.push_back(Instance(2, 2));
+
+    m_EnvironmentTextures[0] = LoadTexture("assets/duck/environment/posx.jpg");
+    m_EnvironmentTextures[1] = LoadTexture("assets/duck/environment/negx.jpg");
+    m_EnvironmentTextures[2] = LoadTexture("assets/duck/environment/posy.jpg");
+    m_EnvironmentTextures[3] = LoadTexture("assets/duck/environment/negy.jpg");
+    m_EnvironmentTextures[4] = LoadTexture("assets/duck/environment/posz.jpg");
+    m_EnvironmentTextures[5] = LoadTexture("assets/duck/environment/negz.jpg");
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -149,9 +161,19 @@ uint32_t Scene::GetDuckInstanceIndex() const
     return 1;
 }
 
+uint32_t Scene::GetEnvironmentInstanceIndex() const
+{
+    return 2;
+}
+
 const Texture& Scene::GetDuckTexture() const
 {
     return m_DuckTexture;
+}
+
+std::span<const Texture, 6> Scene::GetEnvironmentTextures() const
+{
+    return m_EnvironmentTextures;
 }
 
 std::optional<glm::vec2> Scene::GetDisturbance() const
@@ -177,6 +199,61 @@ Mesh Scene::CreateUnitSquareMesh()
     m_Vertices.emplace_back(glm::vec4(-1, 1, 0, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 0));
     m_Indices.append_range(std::array<uint32_t, 3>{ 0, 1, 2 });
     m_Indices.append_range(std::array<uint32_t, 3>{ 2, 3, 0 });
+
+    mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
+    mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;
+
+    return mesh;
+}
+
+Mesh Scene::CreateUnitCubeMesh()
+{
+    Mesh mesh = {
+        .VertexOffset = static_cast<uint32_t>(m_Vertices.size()),
+        .IndexOffset = static_cast<uint32_t>(m_Indices.size()),
+    };
+
+    m_Vertices.emplace_back(glm::vec4(-1, -1, 1, 1), glm::vec4(0, 0, -1, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, -1, 1, 1), glm::vec4(0, 0, -1, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, 1, 1), glm::vec4(0, 0, -1, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, 1, 1), glm::vec4(0, 0, -1, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 2, 1, 0 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 0, 3, 2 });
+
+    m_Vertices.emplace_back(glm::vec4(-1, -1, -1, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, -1, -1, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, -1, 1), glm::vec4(0, 0, 1, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, -1, 1), glm::vec4(0, 0, 1, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 4, 5, 6 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 6, 7, 4 });
+
+    m_Vertices.emplace_back(glm::vec4(-1, -1, -1, 1), glm::vec4(1, 0, 0, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, -1, 1), glm::vec4(1, 0, 0, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, 1, 1), glm::vec4(1, 0, 0, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, -1, 1, 1), glm::vec4(1, 0, 0, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 8, 9, 10 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 10, 11, 8 });
+
+    m_Vertices.emplace_back(glm::vec4(1, -1, -1, 1), glm::vec4(-1, 0, 0, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, -1, 1), glm::vec4(-1, 0, 0, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, 1, 1), glm::vec4(-1, 0, 0, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(1, -1, 1, 1), glm::vec4(-1, 0, 0, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 14, 13, 12 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 12, 15, 14 });
+
+    m_Vertices.emplace_back(glm::vec4(-1, -1, -1, 1), glm::vec4(0, 1, 0, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, -1, -1, 1), glm::vec4(0, 1, 0, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, -1, 1, 1), glm::vec4(0, 1, 0, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, -1, 1, 1), glm::vec4(0, 1, 0, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 18, 17, 16 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 16, 19, 18 });
+
+    m_Vertices.emplace_back(glm::vec4(-1, 1, -1, 1), glm::vec4(0, -1, 0, 0), glm::vec2(0, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, -1, 1), glm::vec4(0, -1, 0, 0), glm::vec2(1, 1));
+    m_Vertices.emplace_back(glm::vec4(1, 1, 1, 1), glm::vec4(0, -1, 0, 0), glm::vec2(1, 0));
+    m_Vertices.emplace_back(glm::vec4(-1, 1, 1, 1), glm::vec4(0, -1, 0, 0), glm::vec2(0, 0));
+    m_Indices.append_range(std::array<uint32_t, 3>{ 20, 21, 22 });
+    m_Indices.append_range(std::array<uint32_t, 3>{ 22, 23, 20 });
 
     mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
     mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;

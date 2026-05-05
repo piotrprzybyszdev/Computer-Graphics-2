@@ -42,7 +42,7 @@ private:
     ref::vulkan::Queue m_MainQueue;
 
     ref::vulkan::ComputePipelineInstanceId m_WaterHeightPipeline, m_WaterNormalPipeline;
-    ref::vulkan::GraphicsPipelineInstanceId m_WaterPipeline, m_DuckPipeline;
+    ref::vulkan::GraphicsPipelineInstanceId m_WaterPipeline, m_DuckPipeline, m_EnvironmentPipeline;
 
     std::unique_ptr<DuckUserInterface> m_UserInterface;
     std::unique_ptr<ref::vulkan::FrameGraph> m_FrameGraph;

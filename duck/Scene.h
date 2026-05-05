@@ -62,8 +62,10 @@ public:
 
     uint32_t GetWaterInstanceIndex() const;
     uint32_t GetDuckInstanceIndex() const;
+    uint32_t GetEnvironmentInstanceIndex() const;
 
     const Texture& GetDuckTexture() const;
+    std::span<const Texture, 6> GetEnvironmentTextures() const;
 
     std::optional<glm::vec2> GetDisturbance() const;
     glm::vec2 GetDuckDisturbance() const;
@@ -99,8 +101,11 @@ private:
     std::optional<glm::vec2> m_Disturbance;
     glm::vec2 m_DuckDisturbance;
 
+    std::array<Texture, 6> m_EnvironmentTextures;
+
 private:
     Mesh CreateUnitSquareMesh();
+    Mesh CreateUnitCubeMesh();
     Mesh LoadMesh(const std::filesystem::path &path);
 
     Texture LoadTexture(const std::filesystem::path& path);

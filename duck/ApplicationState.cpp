@@ -49,6 +49,7 @@ DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
     ShaderId meshVertexShader = spec.ShaderLibrary->GetShaderByPath("Shaders/mesh.vert");
     ShaderId waterFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/water.frag");
     ShaderId duckFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/duck.frag");
+    ShaderId environmentFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/environment.frag");
 
     {
         ComputePipelineInfo pipelineInfo = {
@@ -115,6 +116,14 @@ DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
         pipelineInstanceInfo.Name = "Duck Pipeline Instance";
         pipelineInstanceInfo.PipelineId = duckPipelineId;
         m_DuckPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
+
+        pipelineInfo.Name = "Environment Pipeline";
+        pipelineInfo.FragmentShaderId = environmentFragmentShader;
+
+        auto environmentPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+        pipelineInstanceInfo.Name = "Environment Pipeline Instance";
+        pipelineInstanceInfo.PipelineId = environmentPipelineId;
+        m_EnvironmentPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
     }
 }
 
@@ -174,14 +183,23 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
     );
 
+    const auto& environmentTextures = m_Scene.GetEnvironmentTextures();
+    builder.AddDeviceImage(
+        "Environment Cube Texture", vk::ImageCreateInfo(vk::ImageCreateFlagBits::eCubeCompatible, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(environmentTextures.front().Width, environmentTextures.front().Height, 1), 1, 6)
+        .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled),
+        vk::ImageViewCreateInfo().setFormat(vk::Format::eR8G8B8A8Unorm).setViewType(vk::ImageViewType::eCube).setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6)), ResourceType::Persistent, false
+    );
+
     builder.AddDeviceBuffer("Water Height Buffer 0", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
     builder.AddDeviceBuffer("Water Height Buffer 1", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
     builder.AddDeviceBuffer("Vertex Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer).setSize(m_Scene.GetVertices().size_bytes()), ResourceType::Persistent, false);
     builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), ResourceType::Persistent, false);
-    
+
     builder.AddHostBuffer("Transform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eUniformBuffer).setSize(m_Scene.GetTransforms().size_bytes()), ResourceType::Persistent, true);
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), ResourceType::Persistent, true);
 
+    m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
+    
     {
         ComputePassSpec passSpec = {
             .Pipeline = m_WaterHeightPipeline,
@@ -237,8 +255,6 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     };
 
     {
-        m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
-
         IndexedGraphicsPassSpec passSpec = {
             .Pipeline = m_WaterPipeline,
             .BufferBindings = {
@@ -270,19 +286,6 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     }
 
     {
-        const auto& instance = m_Scene.GetInstances()[m_Scene.GetWaterInstanceIndex()];
-        const auto& mesh = m_Scene.GetMeshes()[instance.MeshIndex];
-        IndexedGraphicsPassSpec::DrawSpec waterDraw = {
-            .Command = {
-                .IndexCount = mesh.IndexCount,
-                .InstanceCount = 1,
-                .FirstIndex = mesh.IndexOffset,
-                .VertexOffset = mesh.VertexOffset,
-                .FirstInstance = 0,
-            },
-            .PushConstantData = std::as_bytes(std::span(&instance.TransformIndex, 1)),
-        };
-
         IndexedGraphicsPassSpec passSpec = {
             .Pipeline = m_DuckPipeline,
             .BufferBindings = {
@@ -307,6 +310,33 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .Draws = { getInstanceDraw(m_Scene.GetDuckInstanceIndex()) },
         };
         builder.AddIndexedGraphicsPass("Duck Pass", passSpec);
+    }
+
+    {
+        IndexedGraphicsPassSpec passSpec = {
+            .Pipeline = m_EnvironmentPipeline,
+            .BufferBindings = {
+                { "Camera Uniform Buffer", 0, true, false },
+                { "Transform Buffer", 1, true, false },
+            },
+            .ImageBindings = {
+                { "Environment Cube Texture", 2, m_TextureSampler, true, false },
+            },
+            .VertexBuffers = {
+                .VertexBuffers = { { "Vertex Buffer" } },
+            },
+            .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
+            .ColorAttachments = {
+                {
+                    .ImageResource = "Image",
+                },
+            },
+            .DepthAttachment = { {
+                .ImageResource = "Depth Stencil Image",
+            } },
+            .Draws = { getInstanceDraw(m_Scene.GetEnvironmentInstanceIndex()) },
+        };
+        builder.AddIndexedGraphicsPass("Environment Pass", passSpec);
     }
 
     {
@@ -340,6 +370,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
         .MainQueue = m_MainQueue,
         .FrameGraph = m_FrameGraph.get(),
         .ResourceAllocator = m_ResourceAllocator.get(),
+        .StagingBufferSize = 16 * 1024 * 1024,
     };
 
     m_Renderer = std::make_unique<Renderer>(rendererSpec);
@@ -371,6 +402,11 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
         m_FrameGraph->GetImage("Duck Color Texture").front().first, duckTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
     );
+    for (int i = 0; i < 6; i++)
+        m_Renderer->UploadWithStaging(
+            m_FrameGraph->GetImage("Environment Cube Texture").front().first, environmentTextures[i].Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, i, 1)
+        );
 }
 
 void DuckApplicationState::OnExit(vulkan::ApplicationState* /* next */)
@@ -408,6 +444,7 @@ void DuckApplicationState::OnResize(const Swapchain* swapchain)
 
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Water Pass"));
     resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Duck Pass"));
+    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Environment Pass"));
 
     std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
 
