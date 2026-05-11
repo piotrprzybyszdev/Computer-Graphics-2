@@ -73,6 +73,11 @@ public:
 private:
     struct Camera
     {
+        bool IsLeftMouseButtonPressed = false, IsRightMouseButtonPressed = false;
+        float Yaw = 0.0f, Pitch = 0.0f, Distance = 1.0f;
+        glm::vec2 PrevMousePosition;
+        glm::vec2 CurrentMousePosition;
+
         glm::mat4x4 View;
         glm::mat4x4 Projection;
         glm::vec4 Origin;

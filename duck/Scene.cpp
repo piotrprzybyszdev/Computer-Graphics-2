@@ -43,21 +43,37 @@ Scene::Scene()
 
 void Scene::OnResize(uint32_t width, uint32_t height)
 {
-    m_Camera.Projection = glm::perspectiveFov(45.0f, static_cast<float>(width), static_cast<float>(height), 0.1f, 1000.0f);
+    m_Camera.Projection = glm::perspectiveFov(70.0f, static_cast<float>(width), static_cast<float>(height), 0.1f, 1000.0f);
 }
 
 void Scene::OnUpdate(float timeStep)
 {
     // camera
     {
+        const glm::vec2 delta = m_Camera.CurrentMousePosition - m_Camera.PrevMousePosition;
+        if (m_Camera.IsLeftMouseButtonPressed)
+        {
+            m_Camera.Pitch -= delta.x * 0.005f;
+            m_Camera.Yaw += delta.y * 0.005f;
+            m_Camera.Yaw = glm::clamp(m_Camera.Yaw, glm::radians(- 89.0f), glm::radians(89.0f));
+        }
+        if (m_Camera.IsRightMouseButtonPressed)
+        {
+            m_Camera.Distance += delta.y * 0.005f;
+        }
+        m_Camera.PrevMousePosition = m_Camera.CurrentMousePosition;
+
         const glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
-        m_Camera.Origin = glm::vec4(0.0f, 1.0f, 2.0f, 1.0f);
-        m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), glm::vec3(0.0f, 0.0f, 0.0f), up);
+        const glm::vec3 at = glm::vec3(0.0f);
+        const glm::vec3 direction = glm::rotate(glm::mat4x4(1.0f), m_Camera.Pitch, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4x4(1.0f), m_Camera.Yaw, glm::vec3(1.0f, 0.0f, 0.0f)) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+
+        m_Camera.Origin = glm::vec4(at - direction * m_Camera.Distance, 1.0f);
+        m_Camera.View = glm::lookAt(glm::vec3(m_Camera.Origin), at, up);
     }
 
     // disturbance
     {
-        std::uniform_int_distribution intDist(0, 10);
+        std::uniform_int_distribution intDist(0, 20);
         if (intDist(m_Rng) == 0)
         {
             std::uniform_real_distribution dist(-1.0f, 1.0f);
@@ -103,12 +119,17 @@ void Scene::OnKeyEvent(ref::Key /* key */, ref::KeyAction /* action */, ref::Mod
 {
 }
 
-void Scene::OnMouseButtonEvent(ref::Button /* button */, ref::ButtonAction /* action */, ref::Mods /* mods */)
+void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods /* mods */)
 {
+    if (button == ref::Button::Left)
+        m_Camera.IsLeftMouseButtonPressed = action == ref::ButtonAction::Press;
+    if (button == ref::Button::Right)
+        m_Camera.IsRightMouseButtonPressed = action == ref::ButtonAction::Press;
 }
 
-void Scene::OnCursorMoveEvent(double /* xpos */, double /* ypos */)
+void Scene::OnCursorMoveEvent(double xpos, double ypos)
 {
+    m_Camera.CurrentMousePosition = glm::vec2(xpos, ypos);
 }
 
 const glm::mat4x4& Scene::GetCameraProjection() const

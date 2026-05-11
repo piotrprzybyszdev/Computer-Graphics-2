@@ -22,6 +22,9 @@ void DuckUserInterface::OnDefineUI(float /* timeStep */)
 void DuckUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
 {
     m_Scene.OnKeyEvent(key, action, mods);
+
+    if (key == Key::H)
+        ErrorApplicationState::ReloadShaders("Duck State");
 }
 
 void DuckUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
@@ -102,7 +105,6 @@ DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
 
         pipelineInstanceInfo.InputAssemblyState.setTopology(vk::PrimitiveTopology::eTriangleList);
         pipelineInstanceInfo.RasterizationState.setLineWidth(1.0f);
-        pipelineInstanceInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eBack);
         pipelineInstanceInfo.DepthStencilState.setDepthTestEnable(vk::True);
         pipelineInstanceInfo.DepthStencilState.setDepthWriteEnable(vk::True);
         pipelineInstanceInfo.DepthStencilState.setDepthCompareOp(vk::CompareOp::eLess);
@@ -115,6 +117,7 @@ DuckApplicationState::DuckApplicationState(const ApplicationStateSpec& spec)
         auto duckPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
         pipelineInstanceInfo.Name = "Duck Pipeline Instance";
         pipelineInstanceInfo.PipelineId = duckPipelineId;
+        pipelineInstanceInfo.RasterizationState.setCullMode(vk::CullModeFlagBits::eBack);
         m_DuckPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
 
         pipelineInfo.Name = "Environment Pipeline";
@@ -263,6 +266,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             },
             .ImageBindings = {
                 { "Water Normal Image", 2, m_TextureSampler, true, false },
+                { "Environment Cube Texture", 3, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },

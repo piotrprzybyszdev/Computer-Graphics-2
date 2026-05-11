@@ -43,9 +43,9 @@ int main()
         ConfigureShaders(application);
 
         vulkan::ErrorApplicationState::AddToApplication(application);
-        vulkan::CompilingShadersApplicationState::AddToApplication(application, "Robot State");
+        vulkan::CompilingShadersApplicationState::AddToApplication(application, "Duck State");
 
-        application.AddAndCreateState<DuckApplicationState>("Robot State");
+        application.AddAndCreateState<DuckApplicationState>("Duck State");
 
         application.Run(vulkan::CompilingShadersApplicationState::g_StateName);
 
