@@ -21,6 +21,7 @@ layout (location = 2) in vec2 v_TexCoord;
 layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec4 o_Normal;
 layout (location = 2) out vec2 o_TexCoord;
+layout (location = 3) out vec4 o_Tangent;
 
 void main()
 {
@@ -29,6 +30,7 @@ void main()
     o_Position = transform * vec4(v_Position.xyz, 1.0f);
     o_Normal = transform * vec4(v_Normal.xyz, 0.0f);
     o_TexCoord = v_TexCoord;
+    o_Tangent = transform * vec4(normalize(cross(v_Normal.xyz, vec3(1.0f, 0.0f, 0.0f))), 0.0f);
 
     gl_Position = u_CameraProjection * u_CameraView * o_Position;
 }

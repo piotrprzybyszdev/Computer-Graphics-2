@@ -43,7 +43,7 @@ Scene::Scene()
 
 void Scene::OnResize(uint32_t width, uint32_t height)
 {
-    m_Camera.Projection = glm::perspectiveFov(70.0f, static_cast<float>(width), static_cast<float>(height), 0.1f, 1000.0f);
+    m_Camera.Projection = glm::perspectiveFov(70.0f, static_cast<float>(width), static_cast<float>(height), 0.01f, 1000.0f);
 }
 
 void Scene::OnUpdate(float timeStep)
