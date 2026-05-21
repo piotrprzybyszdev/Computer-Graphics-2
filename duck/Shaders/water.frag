@@ -43,23 +43,19 @@ float fresnel(float n1, float n2, vec3 N, vec3 V)
 
 void main()
 {
-    const vec3 lightPosition = vec3(0.0f, 1.0f, 0.0f);
+    const vec3 lightPosition = u_CameraOrigin.xyz;
 
     vec3 normal = 2.0f * texture(u_WaterNormal, v_TexCoord).rgb - 1.0f;
 
     const bool belowSurface = u_CameraOrigin.y < 0;
-    normal *= 1.0f;
+    if (belowSurface)
+        normal *= -1.0f;
 
     const vec3 N = normalize(normal.xzy);
     const vec3 L = normalize(lightPosition - v_Position.xyz);
     const vec3 V = normalize(u_CameraOrigin.xyz - v_Position.xyz);
     const vec3 R = normalize(reflect(-L, N));
-    
-    const float ka = 0.2f, kd = 0.8f, ks = 0.5f, m = 100.0f;
-
-    const float diffuse = max(dot(N, L), 0.0f);
-    const float specular = pow(max(dot(R, V), 0.0f), m);
-    
+      
     const float ior = 1.333f;
     const float eta = belowSurface ? ior : 1.0f / ior;
     const vec3 viewReflected = reflect(-V, N);
@@ -76,5 +72,5 @@ void main()
     const float f = fresnel(ior, 1.0f, N, V);
     const vec3 color = fullRefl ? envReflected : mix(envRefracted, envReflected, f);
 
-    o_FragColor = vec4(color * vec3(ka + kd * diffuse + ks * specular), 1.0f);
+    o_FragColor = vec4(color, 1.0f);
 }

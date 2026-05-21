@@ -24,7 +24,10 @@ void DuckUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
     m_Scene.OnKeyEvent(key, action, mods);
 
     if (key == Key::H)
+    {
+        Application::GetInstance()->GetApplicationStateSpec().Queues.at(Application::MainQueueName).Handle.waitIdle();
         ErrorApplicationState::ReloadShaders("Duck State");
+    }
 }
 
 void DuckUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
@@ -167,21 +170,21 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     FrameGraphBuilder builder;
 
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1280, 720, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), ResourceType::Transient, true
     );
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Depth Stencil Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eD24UnormS8Uint, vk::Extent3D(1280, 720, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), ResourceType::Transient, true
     );
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Water Normal Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(256, 256, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled), ResourceType::Transient, true
     );
 
     const auto& duckTexture = m_Scene.GetDuckTexture();
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Duck Color Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(duckTexture.Width, duckTexture.Height, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
     );
@@ -190,8 +193,9 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     builder.AddDeviceImage(
         "Environment Cube Texture", vk::ImageCreateInfo(vk::ImageCreateFlagBits::eCubeCompatible, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(environmentTextures.front().Width, environmentTextures.front().Height, 1), 1, 6)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled),
-        vk::ImageViewCreateInfo().setFormat(vk::Format::eR8G8B8A8Unorm).setViewType(vk::ImageViewType::eCube).setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6)), ResourceType::Persistent, false
+        ResourceType::Persistent, false
     );
+    builder.AddImageView("Environment Cube Texture View", "Environment Cube Texture", vk::ImageViewCreateInfo().setFormat(vk::Format::eR8G8B8A8Unorm).setViewType(vk::ImageViewType::eCube).setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6)));
 
     builder.AddDeviceBuffer("Water Height Buffer 0", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
     builder.AddDeviceBuffer("Water Height Buffer 1", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).setSize(256 * 256 * sizeof(float)), ResourceType::Temporal, false);
@@ -229,7 +233,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Water Height Buffer 1", 1, true, true },
             },
             .ImageBindings = {
-                { "Water Normal Image", 2, nullptr, false, true },
+                { "Water Normal Image View", 2, nullptr, false, true },
             },
             .Dispatches = {
                 {
@@ -265,8 +269,8 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Transform Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Water Normal Image", 2, m_TextureSampler, true, false },
-                { "Environment Cube Texture", 3, m_TextureSampler, true, false },
+                { "Water Normal Image View", 2, m_TextureSampler, true, false },
+                { "Environment Cube Texture View", 3, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },
@@ -274,13 +278,13 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                     .LoadOp = vk::AttachmentLoadOp::eClear,
                     .ClearValue = vk::ClearColorValue(0.2f, 0.2f, 0.2f, 1.0f),
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
                 .LoadOp = vk::AttachmentLoadOp::eClear,
                 .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
             } },
@@ -297,7 +301,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Transform Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Duck Color Texture", 2, m_TextureSampler, true, false },
+                { "Duck Color Texture View", 2, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },
@@ -305,11 +309,11 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = { getInstanceDraw(m_Scene.GetDuckInstanceIndex()) },
         };
@@ -324,7 +328,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Transform Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Environment Cube Texture", 2, m_TextureSampler, true, false },
+                { "Environment Cube Texture View", 2, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },
@@ -332,11 +336,11 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = { getInstanceDraw(m_Scene.GetEnvironmentInstanceIndex()) },
         };
@@ -348,7 +352,7 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
         };
@@ -403,12 +407,12 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     clearBuffer("Water Height Buffer 1");
 
     m_Renderer->UploadWithStaging(
-        m_FrameGraph->GetImage("Duck Color Texture").front().first, duckTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+        m_FrameGraph->GetImage("Duck Color Texture").front(), duckTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
     );
     for (int i = 0; i < 6; i++)
         m_Renderer->UploadWithStaging(
-            m_FrameGraph->GetImage("Environment Cube Texture").front().first, environmentTextures[i].Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+            m_FrameGraph->GetImage("Environment Cube Texture").front(), environmentTextures[i].Content, vk::ImageLayout::eShaderReadOnlyOptimal,
             vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, i, 1)
         );
 }
@@ -435,6 +439,7 @@ void DuckApplicationState::OnResize(const Swapchain* swapchain)
     auto resizeImage = [&](const std::string& name) {
         m_FrameGraph->ModifyImage(name).Info.setExtent(vk::Extent3D(extent, 1));
         m_FrameGraph->UpdateImage(name);
+        m_FrameGraph->UpdateImageView(std::format("{} View", name));
     };
 
     resizeImage("Image");

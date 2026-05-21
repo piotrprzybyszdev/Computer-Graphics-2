@@ -251,11 +251,11 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     FrameGraphBuilder builder;
 
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1280, 720, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment), ResourceType::Transient, true
     );
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Depth Stencil Image", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eD24UnormS8Uint, vk::Extent3D(1280, 720, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment), ResourceType::Transient, true
     );
@@ -274,11 +274,11 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     const Texture& sparkTexture = m_Scene.GetSparkTexture();
     const Texture& mirrorTexture = m_Scene.GetMirrorTexture();
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Spark Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(sparkTexture.Width, sparkTexture.Height, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
     );
-    builder.AddDeviceImage(
+    builder.AddDeviceImageWithView(
         "Mirror Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(mirrorTexture.Width, mirrorTexture.Height, 1), 1, 1)
         .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
     );
@@ -329,18 +329,18 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                     .LoadOp = vk::AttachmentLoadOp::eClear,
                     .ClearValue = vk::ClearColorValue(0.2f, 0.2f, 0.2f, 1.0f),
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
                 .LoadOp = vk::AttachmentLoadOp::eClear,
                 .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
                 .LoadOp = vk::AttachmentLoadOp::eClear,
                 .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
             } },
@@ -365,14 +365,14 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = meshDraws,
         };
@@ -387,18 +387,18 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Particle Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Spark Texture", 4, m_TextureSampler, true, false},
+                { "Spark Texture View", 4, m_TextureSampler, true, false},
             },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = {
                 {
@@ -424,7 +424,7 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Transform Buffer", 3, true, false },
             },
             .ImageBindings = {
-                { "Mirror Texture", 4, m_TextureSampler, true, false },
+                { "Mirror Texture View", 4, m_TextureSampler, true, false },
             },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Position Index Buffer" }, { "Vertex Normal Buffer" } },
@@ -432,14 +432,14 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = { mirrorDraw },
         };
@@ -461,14 +461,14 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
                 .LoadOp = vk::AttachmentLoadOp::eClear,
                 .ClearValue = vk::ClearDepthStencilValue(1.0f, 0),
             } },
@@ -507,14 +507,14 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = std::move(draws),
         };
@@ -537,14 +537,14 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .IndexBuffer = { "Index Buffer", 0, vk::IndexType::eUint32 },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = meshDraws,
         };
@@ -559,18 +559,18 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
                 { "Particle Buffer", 1, true, false },
             },
             .ImageBindings = {
-                { "Spark Texture", 4, m_TextureSampler, true, false},
+                { "Spark Texture View", 4, m_TextureSampler, true, false},
             },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
             .DepthAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .StencilAttachment = { {
-                .ImageResource = "Depth Stencil Image",
+                .ImageViewResource = "Depth Stencil Image View",
             } },
             .Draws = {
                 {
@@ -591,7 +591,7 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
             .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
             .ColorAttachments = {
                 {
-                    .ImageResource = "Image",
+                    .ImageViewResource = "Image View",
                 },
             },
         };
@@ -641,17 +641,20 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
     uploadBuffer("Light Buffer", std::as_bytes(m_Scene.GetLights()));
 
     m_Renderer->UploadWithStaging(
-        m_FrameGraph->GetImage("Spark Texture").front().first, sparkTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+        m_FrameGraph->GetImage("Spark Texture").front(), sparkTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
     );
     m_Renderer->UploadWithStaging(
-        m_FrameGraph->GetImage("Mirror Texture").front().first, mirrorTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
+        m_FrameGraph->GetImage("Mirror Texture").front(), mirrorTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
     );
 }
 
 void RobotApplicationState::OnExit(vulkan::ApplicationState* /* next */)
 {
+    const auto& spec = Application::GetInstance()->GetApplicationStateSpec();
+    spec.LogicalDevice.destroySampler(m_TextureSampler);
+
     m_UserInterface->OnExit();
     m_Renderer.reset();
     m_FrameGraph.reset();
@@ -668,9 +671,11 @@ void RobotApplicationState::OnResize(const Swapchain* swapchain)
 
     m_FrameGraph->ModifyImage("Image").Info.setExtent(vk::Extent3D(extent, 1));
     m_FrameGraph->UpdateImage("Image");
+    m_FrameGraph->UpdateImageView("Image View");
 
     m_FrameGraph->ModifyImage("Depth Stencil Image").Info.setExtent(vk::Extent3D(extent, 1));
     m_FrameGraph->UpdateImage("Depth Stencil Image");
+    m_FrameGraph->UpdateImageView("Depth Stencil Image View");
 
     auto resizeGraphicsPass = [&](auto config) {
         config.GetScissors() = { vk::Rect2D(vk::Offset2D(0, 0), extent) };
