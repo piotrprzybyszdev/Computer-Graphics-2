@@ -17,6 +17,8 @@ option(REF_BUILD_DEMOS OFF)
 
 add_subdirectory(robot)
 add_subdirectory(duck)
+add_subdirectory(tessellation)
+
 add_subdirectory(Rendering-Engine-Framework)
 add_subdirectory(vendor/glm)
 
