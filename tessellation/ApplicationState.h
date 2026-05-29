@@ -55,4 +55,10 @@ private:
     uint32_t m_PatchColorIndex = 1;
 
     vk::Sampler m_TextureSampler;
+
+    bool m_ShowControlLines = false;
+    const ref::vulkan::Swapchain* m_Swapchain = nullptr;
+
+private:
+    void RebuildFrameGraph();
 };

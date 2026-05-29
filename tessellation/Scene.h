@@ -30,6 +30,7 @@ struct TessellationControls
 {
     uint32_t InsideTessFactor = 1;
     uint32_t OutsideTessFactor = 1;
+    bool ShowControlLines = false;
 };
 
 class Scene

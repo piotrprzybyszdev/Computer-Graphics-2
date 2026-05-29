@@ -117,15 +117,6 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
     [[maybe_unused]] bool success = spec.PipelineLibrary->CompilePipelines();
     assert(success == true);
 
-    ResourceManagerSpec resourceManagerSpec = {
-        .ApiVersion = spec.ApiVersion,
-        .Instance = spec.Instance,
-        .PhysicalDevice = spec.PhysicalDevice,
-        .LogicalDevice = spec.LogicalDevice,
-    };
-
-    m_ResourceAllocator = std::make_unique<ResourceAllocator>(resourceManagerSpec);
-
     const uint32_t imageCount = std::clamp(2u, spec.SwapchainBuilder->GetMinImageCount(), spec.SwapchainBuilder->GetMaxImageCount());
     UserInterfaceVulkanSpec userInterfaceSpec = {
         .Window = spec.ApplicationWindow->GetHandle(),
@@ -139,7 +130,117 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
         .ImageFormat = vk::Format::eR8G8B8A8Unorm,
     };
 
+    m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
+
     m_UserInterface = std::make_unique<TessellationUserInterface>(userInterfaceSpec, m_Scene);
+    m_UserInterface->OnEnter();
+
+    RebuildFrameGraph();
+}
+
+void TessellationApplicationState::OnExit(vulkan::ApplicationState* /* next */)
+{
+    const auto& spec = Application::GetInstance()->GetApplicationStateSpec();
+    spec.LogicalDevice.destroySampler(m_TextureSampler);
+
+    m_UserInterface->OnExit();
+    m_Renderer.reset();
+    m_FrameGraph.reset();
+    m_UserInterface.reset();
+    m_ResourceAllocator.reset();
+}
+
+void TessellationApplicationState::OnResize(const Swapchain* swapchain)
+{
+    m_Swapchain = swapchain;
+    m_Renderer->OnResize(swapchain);
+
+    const vk::Extent2D extent = swapchain->GetExtent();
+    m_Scene.OnResize(extent.width, extent.height);
+
+    auto resizeImage = [&](const std::string& name) {
+        m_FrameGraph->ModifyImage(name).Info.setExtent(vk::Extent3D(extent, 1));
+        m_FrameGraph->UpdateImage(name);
+        m_FrameGraph->UpdateImageView(std::format("{} View", name));
+    };
+
+    resizeImage("Image");
+    resizeImage("Depth Stencil Image");
+
+    auto resizeGraphicsPass = [&](auto config) {
+        config.GetScissors() = { vk::Rect2D(vk::Offset2D(0, 0), extent) };
+        config.GetViewports() = { vk::Viewport(0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1) };
+        config.GetRenderArea().extent = extent;
+    };
+
+    resizeGraphicsPass(m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass"));
+    if (m_ShowControlLines)
+        resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass"));
+
+    std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
+
+    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetSrcOffsets().front() = offsets;
+    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetDstOffsets().front() = offsets;
+}
+
+void TessellationApplicationState::OnUpdate(float timeStep)
+{
+    m_UserInterface->OnUpdate(timeStep);
+
+    m_Scene.OnUpdate(timeStep);
+
+    if (m_ShowControlLines != m_Scene.GetTessellationControls().ShowControlLines)
+    {
+        m_MainQueue.Handle.waitIdle();
+        RebuildFrameGraph();
+        m_ShowControlLines = m_Scene.GetTessellationControls().ShowControlLines;
+        OnResize(m_Swapchain);
+    }
+
+    {
+        const auto &patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
+        m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass").GetDrawCommand().front().Command.FirstVertex = patch.VertexOffset;
+        if (m_ShowControlLines)
+        {
+            m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.FirstIndex = patch.IndexOffset;
+            m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.VertexOffset = patch.VertexOffset;
+        }
+    }
+}
+
+void TessellationApplicationState::OnRender()
+{
+    m_Renderer->BeginFrame();
+
+    {
+        CameraConstants camera = {
+            .Projection = m_Scene.GetCameraProjection(),
+            .View = m_Scene.GetCameraView(),
+            .Origin = m_Scene.GetCameraOrigin(),
+            .Color0 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+            .Color1 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f),
+            .InsideTessFactor = m_Scene.GetTessellationControls().InsideTessFactor,
+            .OutsideTessFactor = m_Scene.GetTessellationControls().OutsideTessFactor,
+        };
+        auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
+        m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
+    }
+
+    m_Renderer->EndFrame();
+}
+
+void TessellationApplicationState::RebuildFrameGraph()
+{
+    const auto& spec = Application::GetInstance()->GetApplicationStateSpec();
+
+    ResourceManagerSpec resourceManagerSpec = {
+        .ApiVersion = spec.ApiVersion,
+        .Instance = spec.Instance,
+        .PhysicalDevice = spec.PhysicalDevice,
+        .LogicalDevice = spec.LogicalDevice,
+    };
+
+    m_ResourceAllocator = std::make_unique<ResourceAllocator>(resourceManagerSpec);
 
     FrameGraphBuilder builder;
 
@@ -156,8 +257,6 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
     builder.AddDeviceBuffer("Index Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer).setSize(m_Scene.GetIndices().size_bytes()), ResourceType::Persistent, false);
 
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), ResourceType::Persistent, true);
-
-    m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
 
     {
         const auto& patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
@@ -196,6 +295,7 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
         builder.AddGraphicsPass("Patch Pass", passSpec);
     }
 
+    if (m_Scene.GetTessellationControls().ShowControlLines)
     {
         const auto& patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
         IndexedGraphicsPassSpec passSpec = {
@@ -232,19 +332,6 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
     }
 
     {
-        CustomGraphicsPassSpec passSpec = {
-            .OnRender = [this](vk::CommandBuffer cmd) { m_UserInterface->OnRenderVulkan(cmd); },
-            .ColorAttachments = {
-                {
-                    .ImageViewResource = "Image View",
-                },
-            },
-        };
-
-        builder.AddCustomGraphicsPass("UI Pass", passSpec);
-    }
-
-    {
         vk::ImageSubresourceLayers layers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
 
         BlitPassSpec blitSpec = {
@@ -266,8 +353,6 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
 
     m_Renderer = std::make_unique<Renderer>(rendererSpec);
 
-    m_UserInterface->OnEnter();
-
     auto uploadBuffer = [&](const std::string& name, std::span<const std::byte> data) {
         assert(m_FrameGraph->GetBuffer(name).size() == 1);
         auto bufferId = m_FrameGraph->GetBuffer(name).front();
@@ -275,88 +360,8 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
             m_Renderer->UploadWithStaging(bufferId, data);
         else
             m_ResourceAllocator->UploadToBuffer(bufferId, data.data(), data.size());
-    };
+        };
 
     uploadBuffer("Vertex Buffer", std::as_bytes(m_Scene.GetVertices()));
     uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetIndices()));
-}
-
-void TessellationApplicationState::OnExit(vulkan::ApplicationState* /* next */)
-{
-    const auto& spec = Application::GetInstance()->GetApplicationStateSpec();
-    spec.LogicalDevice.destroySampler(m_TextureSampler);
-
-    m_UserInterface->OnExit();
-    m_Renderer.reset();
-    m_FrameGraph.reset();
-    m_UserInterface.reset();
-    m_ResourceAllocator.reset();
-}
-
-void TessellationApplicationState::OnResize(const Swapchain* swapchain)
-{
-    m_Renderer->OnResize(swapchain);
-
-    const vk::Extent2D extent = swapchain->GetExtent();
-    m_Scene.OnResize(extent.width, extent.height);
-
-    auto resizeImage = [&](const std::string& name) {
-        m_FrameGraph->ModifyImage(name).Info.setExtent(vk::Extent3D(extent, 1));
-        m_FrameGraph->UpdateImage(name);
-        m_FrameGraph->UpdateImageView(std::format("{} View", name));
-    };
-
-    resizeImage("Image");
-    resizeImage("Depth Stencil Image");
-
-    auto resizeGraphicsPass = [&](auto config) {
-        config.GetScissors() = { vk::Rect2D(vk::Offset2D(0, 0), extent) };
-        config.GetViewports() = { vk::Viewport(0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1) };
-        config.GetRenderArea().extent = extent;
-    };
-
-    resizeGraphicsPass(m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass"));
-    resizeGraphicsPass(m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass"));
-
-    std::array<vk::Offset3D, 2> offsets = { vk::Offset3D(), vk::Offset3D(extent.width, extent.height, 1) };
-
-    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetSrcOffsets().front() = offsets;
-    m_FrameGraph->GetBlitPassDynamicConfig("Blit Pass").GetDstOffsets().front() = offsets;
-
-    m_FrameGraph->GetCustomGraphicsPassDynamicConfig("UI Pass").GetRenderArea().extent = swapchain->GetExtent();
-}
-
-void TessellationApplicationState::OnUpdate(float timeStep)
-{
-    m_UserInterface->OnUpdate(timeStep);
-
-    m_Scene.OnUpdate(timeStep);
-
-    {
-        const auto &patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
-        m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass").GetDrawCommand().front().Command.FirstVertex = patch.VertexOffset;
-        m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.FirstIndex = patch.IndexOffset;
-        m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.VertexOffset = patch.VertexOffset;
-    }
-}
-
-void TessellationApplicationState::OnRender()
-{
-    m_Renderer->BeginFrame();
-
-    {
-        CameraConstants camera = {
-            .Projection = m_Scene.GetCameraProjection(),
-            .View = m_Scene.GetCameraView(),
-            .Origin = m_Scene.GetCameraOrigin(),
-            .Color0 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-            .Color1 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f),
-            .InsideTessFactor = m_Scene.GetTessellationControls().InsideTessFactor,
-            .OutsideTessFactor = m_Scene.GetTessellationControls().OutsideTessFactor,
-        };
-        auto bufferId = m_FrameGraph->GetCurrentBuffer("Camera Uniform Buffer");
-        m_ResourceAllocator->UploadToBuffer(bufferId, &camera, sizeof(CameraConstants));
-    }
-
-    m_Renderer->EndFrame();
 }

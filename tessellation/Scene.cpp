@@ -67,6 +67,9 @@ void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */
         case ref::Key::Space:
             m_CurrentPatchIndex = m_CurrentPatchIndex == 0 ? 1 : 0;
             break;
+        case ref::Key::C:
+            m_TessellationControls.ShowControlLines = !m_TessellationControls.ShowControlLines;
+            break;
         }
     }
 }
