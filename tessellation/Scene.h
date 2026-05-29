@@ -31,6 +31,7 @@ struct TessellationControls
     uint32_t InsideTessFactor = 1;
     uint32_t OutsideTessFactor = 1;
     bool ShowControlLines = false;
+    bool ShadePhong = false;
 };
 
 class Scene

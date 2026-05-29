@@ -43,6 +43,7 @@ private:
 
     ref::vulkan::GraphicsPipelineInstanceId m_LinePipeline;
     ref::vulkan::GraphicsPipelineInstanceId m_PatchPipeline;
+    ref::vulkan::GraphicsPipelineInstanceId m_PhongPatchPipeline;
 
     std::unique_ptr<TessellationUserInterface> m_UserInterface;
     std::unique_ptr<ref::vulkan::FrameGraph> m_FrameGraph;
@@ -57,6 +58,7 @@ private:
     vk::Sampler m_TextureSampler;
 
     bool m_ShowControlLines = false;
+    bool m_ShadePhong = false;
     const ref::vulkan::Swapchain* m_Swapchain = nullptr;
 
 private:

@@ -59,6 +59,7 @@ TessellationApplicationState::TessellationApplicationState(const ApplicationStat
     ShaderId quadTessellationControlShader = spec.ShaderLibrary->GetShaderByPath("Shaders/quad.tesc");
     ShaderId quadTessellationEvaluationShader = spec.ShaderLibrary->GetShaderByPath("Shaders/quad.tese");
     ShaderId colorFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/color.frag");
+    ShaderId phongFragmentShader = spec.ShaderLibrary->GetShaderByPath("Shaders/phong.frag");
 
     {
         GraphicsPipelineInfo pipelineInfo = {
@@ -78,6 +79,11 @@ TessellationApplicationState::TessellationApplicationState(const ApplicationStat
         };
 
         auto patchPipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
+
+        pipelineInfo.Name = "Patch Phong Pipeline";
+        pipelineInfo.FragmentShaderId = phongFragmentShader;
+
+        auto patchPhongipelineId = spec.PipelineLibrary->AddPipeline(pipelineInfo);
 
         GraphicsPipelineInstanceInfo pipelineInstanceInfo = {
             .Name = "Line Pipeline Instance",
@@ -103,6 +109,11 @@ TessellationApplicationState::TessellationApplicationState(const ApplicationStat
         pipelineInstanceInfo.RasterizationState.setPolygonMode(vk::PolygonMode::eLine);
         pipelineInstanceInfo.TessellationState.setPatchControlPoints(16);
         m_PatchPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
+
+        pipelineInstanceInfo.Name = "Patch Phong Pipeline Instance";
+        pipelineInstanceInfo.RasterizationState.setPolygonMode(vk::PolygonMode::eFill);
+        pipelineInstanceInfo.PipelineId = patchPhongipelineId;
+        m_PhongPatchPipeline = spec.PipelineLibrary->AddPipelineInstance(pipelineInstanceInfo);
     }
 }
 
@@ -189,11 +200,13 @@ void TessellationApplicationState::OnUpdate(float timeStep)
 
     m_Scene.OnUpdate(timeStep);
 
-    if (m_ShowControlLines != m_Scene.GetTessellationControls().ShowControlLines)
+    if (m_ShowControlLines != m_Scene.GetTessellationControls().ShowControlLines || 
+        m_ShadePhong != m_Scene.GetTessellationControls().ShadePhong)
     {
         m_MainQueue.Handle.waitIdle();
-        RebuildFrameGraph();
         m_ShowControlLines = m_Scene.GetTessellationControls().ShowControlLines;
+        m_ShadePhong = m_Scene.GetTessellationControls().ShadePhong;
+        RebuildFrameGraph();
         OnResize(m_Swapchain);
     }
 
@@ -261,7 +274,7 @@ void TessellationApplicationState::RebuildFrameGraph()
     {
         const auto& patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
         GraphicsPassSpec passSpec = {
-            .Pipeline = m_PatchPipeline,
+            .Pipeline = m_ShadePhong ? m_PhongPatchPipeline : m_PatchPipeline,
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
             },
@@ -295,7 +308,7 @@ void TessellationApplicationState::RebuildFrameGraph()
         builder.AddGraphicsPass("Patch Pass", passSpec);
     }
 
-    if (m_Scene.GetTessellationControls().ShowControlLines)
+    if (m_ShowControlLines)
     {
         const auto& patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
         IndexedGraphicsPassSpec passSpec = {

@@ -70,6 +70,9 @@ void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */
         case ref::Key::C:
             m_TessellationControls.ShowControlLines = !m_TessellationControls.ShowControlLines;
             break;
+        case ref::Key::P:
+            m_TessellationControls.ShadePhong = !m_TessellationControls.ShadePhong;
+            break;
         }
     }
 }
