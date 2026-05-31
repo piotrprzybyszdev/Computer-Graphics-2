@@ -1,9 +1,7 @@
 #define GLM_FORCE_LEFT_HANDED
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
+#include <fstream>
 #include <ranges>
 #include <vector>
 
@@ -14,6 +12,10 @@ Scene::Scene()
     m_Patches.push_back(CreatePatch0());
     m_Patches.push_back(CreatePatch1());
     m_Patches.push_back(CreatePatch2());
+
+    m_DiffuseTexture = LoadTexture("assets/tessellation/diffuse.dds");
+    m_HeightTexture = LoadTexture("assets/tessellation/height.dds");
+    m_NormalTexture = LoadTexture("assets/tessellation/normals.dds");
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -135,6 +137,21 @@ uint32_t Scene::GetCurrentPatchIndex() const
     return m_CurrentPatchIndex;
 }
 
+const Texture& Scene::GetDiffuseTexture() const
+{
+    return m_DiffuseTexture;
+}
+
+const Texture& Scene::GetHeightTexture() const
+{
+    return m_HeightTexture;
+}
+
+const Texture& Scene::GetNormalTexture() const
+{
+    return m_NormalTexture;
+}
+
 Patch Scene::CreatePatch0()
 {
     Patch mesh = {
@@ -246,15 +263,67 @@ Patch Scene::CreatePatch2()
 
 Texture Scene::LoadTexture(const std::filesystem::path& path)
 {
-    int x, y, channels;
-    stbi_uc *data = stbi_load(path.string().c_str(), &x, &y, &channels, STBI_rgb_alpha);
-    const size_t size = 4ull * x * y;
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+    assert(file.is_open());
 
-    Texture texture = { static_cast<uint32_t>(x), static_cast<uint32_t>(y) };
-    std::byte* content = reinterpret_cast<std::byte*>(data);
-    texture.Content.assign(content, content + size);
+    struct DDS_PIXELFORMAT {
+        uint32_t dwSize;
+        uint32_t dwFlags;
+        uint32_t dwFourCC;
+        uint32_t dwRGBBitCount;
+        uint32_t dwRBitMask;
+        uint32_t dwGBitMask;
+        uint32_t dwBBitMask;
+        uint32_t dwABitMask;
+    };
 
-    stbi_image_free(data);
+    struct DDS_HEADER {
+        uint32_t           dwSize;
+        uint32_t           dwFlags;
+        uint32_t           dwHeight;
+        uint32_t           dwWidth;
+        uint32_t           dwPitchOrLinearSize;
+        uint32_t           dwDepth;
+        uint32_t           dwMipMapCount;
+        uint32_t           dwReserved1[11];
+        DDS_PIXELFORMAT    ddspf;
+        uint32_t           dwCaps;
+        uint32_t           dwCaps2;
+        uint32_t           dwCaps3;
+        uint32_t           dwCaps4;
+        uint32_t           dwReserved2;
+    };
 
+    uint32_t magic;
+    file.read(reinterpret_cast<char*>(&magic), 4);
+    assert(magic == 0x20534444);
+
+    DDS_HEADER header;
+    file.read(reinterpret_cast<char *>(&header), sizeof(DDS_HEADER));
+    assert((header.ddspf.dwFlags & 0x4) == 0);
+    
+    assert(std::has_single_bit(header.dwWidth));
+    assert(std::has_single_bit(header.dwHeight));
+    Texture texture = {
+        .Width = header.dwWidth,
+        .Height = header.dwHeight,
+    };
+    texture.Content.resize(header.dwMipMapCount);
+
+    if (header.ddspf.dwRBitMask == 0x00ff0000 && header.ddspf.dwGBitMask == 0x0000ff00 && header.ddspf.dwBBitMask == 0x000000ff)
+        texture.Format = Texture::PixelFormat::BGRA8;
+    else if (header.ddspf.dwRBitMask == 0x000000ff && header.ddspf.dwGBitMask == 0x0000ff00 && header.ddspf.dwBBitMask == 0x00ff0000)
+        texture.Format = Texture::PixelFormat::RGBA8;
+    else
+        std::terminate();
+
+    size_t size = 4 * texture.Width * texture.Height;
+    for (int i = 0; i < texture.Content.size(); i++)
+    {
+        texture.Content[i].resize(size);
+        file.read(reinterpret_cast<char*>(texture.Content[i].data()), texture.Content[i].size());
+        size /= 4;
+    }
+    
     return texture;
 }

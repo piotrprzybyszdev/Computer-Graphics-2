@@ -23,7 +23,8 @@ struct Texture
 {
     uint32_t Width;
     uint32_t Height;
-    std::vector<std::byte> Content;
+    std::vector<std::vector<std::byte>> Content;
+    enum class PixelFormat { RGBA8, BGRA8 } Format;
 };
 
 struct TessellationControls
@@ -59,6 +60,10 @@ public:
 
     uint32_t GetCurrentPatchIndex() const;
 
+    const Texture &GetDiffuseTexture() const;
+    const Texture &GetHeightTexture() const;
+    const Texture &GetNormalTexture() const;
+
 private:
     struct Camera
     {
@@ -80,6 +85,10 @@ private:
     std::vector<Patch> m_Patches;
 
     uint32_t m_CurrentPatchIndex = 0;
+
+    Texture m_DiffuseTexture;
+    Texture m_HeightTexture;
+    Texture m_NormalTexture;
 
 private:
     Patch CreatePatch0();

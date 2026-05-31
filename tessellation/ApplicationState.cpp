@@ -273,6 +273,35 @@ void TessellationApplicationState::RebuildFrameGraph()
 
     builder.AddHostBuffer("Camera Uniform Buffer", vk::BufferCreateInfo().setUsage(vk::BufferUsageFlagBits::eUniformBuffer).setSize(sizeof(CameraConstants)), ResourceType::Persistent, true);
 
+    const auto diffuseTexture = m_Scene.GetDiffuseTexture();
+    const auto heightTexture = m_Scene.GetHeightTexture();
+    const auto normalTexture = m_Scene.GetNormalTexture();
+    auto getFormat = [](Texture::PixelFormat format) {
+        switch (format) {
+        case Texture::PixelFormat::BGRA8:
+            return vk::Format::eB8G8R8A8Unorm;
+        case Texture::PixelFormat::RGBA8:
+            return vk::Format::eR8G8B8A8Unorm;
+        default:
+            std::terminate();
+        }
+    };
+
+    builder.AddDeviceImageWithView(
+        "Diffuse Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, getFormat(diffuseTexture.Format), vk::Extent3D(diffuseTexture.Width, diffuseTexture.Height, 1),
+        static_cast<uint32_t>(diffuseTexture.Content.size()), 1).setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
+    );
+
+    builder.AddDeviceImageWithView(
+        "Height Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, getFormat(heightTexture.Format), vk::Extent3D(heightTexture.Width, heightTexture.Height, 1),
+        static_cast<uint32_t>(heightTexture.Content.size()), 1).setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
+    );
+
+    builder.AddDeviceImageWithView(
+        "Normal Texture", vk::ImageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, getFormat(normalTexture.Format), vk::Extent3D(normalTexture.Width, normalTexture.Height, 1),
+        static_cast<uint32_t>(normalTexture.Content.size()), 1).setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled), ResourceType::Persistent, false
+    );
+
     {
         const auto& patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
         GraphicsPassSpec passSpec = {
@@ -379,4 +408,21 @@ void TessellationApplicationState::RebuildFrameGraph()
 
     uploadBuffer("Vertex Buffer", std::as_bytes(m_Scene.GetVertices()));
     uploadBuffer("Index Buffer", std::as_bytes(m_Scene.GetIndices()));
+
+    auto uploadTexture = [&](const std::string &name, const Texture& texture) {
+        uint32_t width = texture.Width, height = texture.Height;
+        for (int i = 0; i < texture.Content.size(); i++)
+        {
+            m_Renderer->UploadWithStaging(
+                m_FrameGraph->GetImage(name).front(), texture.Content[i], vk::ImageLayout::eShaderReadOnlyOptimal,
+                vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, i, 0, 1), vk::Extent3D(width, height, 1)
+            );
+            width /= 2;
+            height /= 2;
+        }
+    };
+
+    uploadTexture("Diffuse Texture", m_Scene.GetDiffuseTexture());
+    uploadTexture("Height Texture", m_Scene.GetHeightTexture());
+    uploadTexture("Normal Texture", m_Scene.GetNormalTexture());
 }
