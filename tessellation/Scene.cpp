@@ -13,6 +13,7 @@ Scene::Scene()
 {
     m_Patches.push_back(CreatePatch0());
     m_Patches.push_back(CreatePatch1());
+    m_Patches.push_back(CreatePatch2());
 }
 
 void Scene::OnResize(uint32_t width, uint32_t height)
@@ -48,24 +49,28 @@ void Scene::OnUpdate(float /* timeStep */)
 
 void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */)
 {
+    auto updateTessFactor = [](float factor, float change) {
+        return std::clamp(((factor - 1.0f) * 10.0f + change) / 10.0f + 1.0f, 0.1f, 2.0f);
+    };
+
     if (action == ref::KeyAction::Release)
     {
         switch (key)
         {
         case ref::Key::A:
-            m_TessellationControls.InsideTessFactor--;
+            m_TessellationControls.InsideTessFactor = updateTessFactor(m_TessellationControls.InsideTessFactor, -1.0f);
             break;
         case ref::Key::D:
-            m_TessellationControls.InsideTessFactor++;
+            m_TessellationControls.InsideTessFactor = updateTessFactor(m_TessellationControls.InsideTessFactor, 1.0f);
             break;
         case ref::Key::Q:
-            m_TessellationControls.OutsideTessFactor--;
+            m_TessellationControls.OutsideTessFactor = updateTessFactor(m_TessellationControls.OutsideTessFactor, -1.0f);
             break;
         case ref::Key::E:
-            m_TessellationControls.OutsideTessFactor++;
+            m_TessellationControls.OutsideTessFactor = updateTessFactor(m_TessellationControls.OutsideTessFactor, 1.0f);
             break;
         case ref::Key::Space:
-            m_CurrentPatchIndex = m_CurrentPatchIndex == 0 ? 1 : 0;
+            m_CurrentPatchIndex = (++m_CurrentPatchIndex) % m_Patches.size();
             break;
         case ref::Key::C:
             m_TessellationControls.ShowControlLines = !m_TessellationControls.ShowControlLines;
@@ -188,6 +193,51 @@ Patch Scene::CreatePatch1()
             m_Indices.push_back((j + 1) * 4 + i);
         }
 
+    mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
+    mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;
+
+    return mesh;
+}
+
+Patch Scene::CreatePatch2()
+{
+    Patch mesh = { 
+        .VertexOffset = static_cast<uint32_t>(m_Vertices.size()),
+        .IndexOffset = static_cast<uint32_t>(m_Indices.size()),
+    };
+
+    for (int patchI = 0; patchI < 4; patchI++)
+    {
+        for (int patchJ = 0; patchJ < 4; patchJ++)
+        {
+            const float fromX = std::lerp(-1.0f, 1.0f, patchI / 4.0f);
+            const float toX = std::lerp(-1.0f, 1.0f, (patchI + 1) / 4.0f);
+            const float fromZ = std::lerp(-1.0f, 1.0f, patchJ / 4.0f);
+            const float toZ = std::lerp(-1.0f, 1.0f, (patchJ + 1) / 4.0f);
+
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    const float x = std::lerp(fromX, toX, i / 3.0f);
+                    const float y = (i > 0 && i < 3 ? 0.333f : 0.0f) * (patchI % 2 == 0 ? 1 : -1);
+                    const float z = std::lerp(fromZ, toZ, j / 3.0f);
+                    m_Vertices.emplace_back(glm::vec4(x, y, z, 1.0f));
+                }
+
+
+            const int offset = ((patchI * 4) + patchJ) * 16;
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 3; j++)
+                {
+                    m_Indices.push_back(offset + i * 4 + j);
+                    m_Indices.push_back(offset + i * 4 + j + 1);
+
+                    m_Indices.push_back(offset + j * 4 + i);
+                    m_Indices.push_back(offset + (j + 1) * 4 + i);
+                }
+        }
+    }
+    
     mesh.VertexCount = static_cast<uint32_t>(m_Vertices.size()) - mesh.VertexOffset;
     mesh.IndexCount = static_cast<uint32_t>(m_Indices.size()) - mesh.IndexOffset;
 

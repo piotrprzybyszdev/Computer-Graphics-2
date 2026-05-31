@@ -23,10 +23,10 @@ void TessellationUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
 {
     m_Scene.OnKeyEvent(key, action, mods);
 
-    if (key == Key::H)
+    if (key == Key::H && action == KeyAction::Release)
     {
         Application::GetInstance()->GetApplicationStateSpec().Queues.at(Application::MainQueueName).Handle.waitIdle();
-        ErrorApplicationState::ReloadShaders("Duck State");
+        ErrorApplicationState::ReloadShaders(CompilingShadersApplicationState::g_StateName);
     }
 }
 
@@ -47,8 +47,8 @@ struct CameraConstants
     glm::vec4 Origin;
     glm::vec4 Color0;
     glm::vec4 Color1;
-    uint32_t InsideTessFactor;
-    uint32_t OutsideTessFactor;
+    float InsideTessFactor;
+    float OutsideTessFactor;
     glm::uvec2 pad0;
 };
 
@@ -212,10 +212,12 @@ void TessellationApplicationState::OnUpdate(float timeStep)
 
     {
         const auto &patch = m_Scene.GetPatches()[m_Scene.GetCurrentPatchIndex()];
+        m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass").GetDrawCommand().front().Command.VertexCount = patch.VertexCount;
         m_FrameGraph->GetGraphicsPassDynamicConfig("Patch Pass").GetDrawCommand().front().Command.FirstVertex = patch.VertexOffset;
         if (m_ShowControlLines)
         {
             m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.FirstIndex = patch.IndexOffset;
+            m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.IndexCount = patch.IndexCount;
             m_FrameGraph->GetIndexedGraphicsPassDynamicConfig("Line Pass").GetIndexedDrawCommand().front().Command.VertexOffset = patch.VertexOffset;
         }
     }

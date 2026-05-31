@@ -28,8 +28,8 @@ struct Texture
 
 struct TessellationControls
 {
-    uint32_t InsideTessFactor = 1;
-    uint32_t OutsideTessFactor = 1;
+    float InsideTessFactor = 1.0f;
+    float OutsideTessFactor = 1.0f;
     bool ShowControlLines = false;
     bool ShadePhong = false;
 };
@@ -84,6 +84,7 @@ private:
 private:
     Patch CreatePatch0();
     Patch CreatePatch1();
+    Patch CreatePatch2();
 
     Texture LoadTexture(const std::filesystem::path& path);
 };
