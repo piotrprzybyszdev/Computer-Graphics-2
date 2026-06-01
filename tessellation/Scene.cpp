@@ -86,6 +86,8 @@ void Scene::OnKeyEvent(ref::Key key, ref::KeyAction action, ref::Mods /* mods */
 
 void Scene::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods /* mods */)
 {
+    m_Camera.IsLeftMouseButtonPressed = false;
+    m_Camera.IsRightMouseButtonPressed = false;
     if (button == ref::Button::Left)
         m_Camera.IsLeftMouseButtonPressed = action == ref::ButtonAction::Press;
     if (button == ref::Button::Right)

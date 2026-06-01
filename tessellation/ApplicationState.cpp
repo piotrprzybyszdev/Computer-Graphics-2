@@ -11,7 +11,8 @@
 using namespace ref;
 using namespace ref::vulkan;
 
-TessellationUserInterface::TessellationUserInterface(const UserInterfaceVulkanSpec& spec, Scene& scene) : UserInterface(spec), m_Scene(scene)
+TessellationUserInterface::TessellationUserInterface(const UserInterfaceVulkanSpec& spec, ShaderReloader &shaderReloader, Scene& scene)
+    : UserInterface(spec), m_ShaderReloader(shaderReloader), m_Scene(scene)
 {
 }
 
@@ -24,10 +25,7 @@ void TessellationUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
     m_Scene.OnKeyEvent(key, action, mods);
 
     if (key == Key::H && action == KeyAction::Release)
-    {
-        Application::GetInstance()->GetApplicationStateSpec().Queues.at(Application::MainQueueName).Handle.waitIdle();
-        ErrorApplicationState::ReloadShaders(CompilingShadersApplicationState::g_StateName);
-    }
+        m_ShaderReloader.ReloadShaders();
 }
 
 void TessellationUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
@@ -53,7 +51,7 @@ struct CameraConstants
 };
 
 TessellationApplicationState::TessellationApplicationState(const ApplicationStateSpec& spec)
-    : m_MainQueue(spec.Queues.at(Application::MainQueueName))
+    : m_ShaderReloader("Tessellation State", { spec.Queues.at(Application::MainQueueName) }, std::thread::hardware_concurrency(), * spec.PipelineLibrary), m_MainQueue(spec.Queues.at(Application::MainQueueName))
 {
     ShaderId meshVertexShader = spec.ShaderLibrary->GetShaderByPath("Shaders/mesh.vert");
     ShaderId quadTessellationControlShader = spec.ShaderLibrary->GetShaderByPath("Shaders/quad.tesc");
@@ -143,7 +141,7 @@ void TessellationApplicationState::OnEnter(vulkan::ApplicationState* /* previous
 
     m_TextureSampler = spec.LogicalDevice.createSampler(vk::SamplerCreateInfo().setMinFilter(vk::Filter::eLinear).setMagFilter(vk::Filter::eLinear));
 
-    m_UserInterface = std::make_unique<TessellationUserInterface>(userInterfaceSpec, m_Scene);
+    m_UserInterface = std::make_unique<TessellationUserInterface>(userInterfaceSpec, m_ShaderReloader, m_Scene);
     m_UserInterface->OnEnter();
 
     RebuildFrameGraph();
@@ -196,6 +194,7 @@ void TessellationApplicationState::OnResize(const Swapchain* swapchain)
 
 void TessellationApplicationState::OnUpdate(float timeStep)
 {
+    m_ShaderReloader.OnUpdate(timeStep);
     m_UserInterface->OnUpdate(timeStep);
 
     m_Scene.OnUpdate(timeStep);
@@ -309,6 +308,9 @@ void TessellationApplicationState::RebuildFrameGraph()
             .BufferBindings = {
                 { "Camera Uniform Buffer", 0, true, false },
             },
+            .ImageBindings = {
+                { "Height Texture View", 1, m_TextureSampler, true, false },
+            },
             .VertexBuffers = {
                 .VertexBuffers = { { "Vertex Buffer" } },
             },
@@ -336,6 +338,13 @@ void TessellationApplicationState::RebuildFrameGraph()
                 }
             },
         };
+
+        if (m_ShadePhong)
+        {
+            passSpec.ImageBindings.emplace_back("Diffuse Texture View", 2, m_TextureSampler, true, false);
+            passSpec.ImageBindings.emplace_back("Normal Texture View", 3, m_TextureSampler, true, false);
+        }
+
         builder.AddGraphicsPass("Patch Pass", passSpec);
     }
 

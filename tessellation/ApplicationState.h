@@ -11,7 +11,7 @@
 class TessellationUserInterface final : public ref::UserInterface
 {
 public:
-    TessellationUserInterface(const ref::UserInterfaceVulkanSpec& spec, Scene &scene);
+    TessellationUserInterface(const ref::UserInterfaceVulkanSpec& spec, ref::vulkan::ShaderReloader &shaderReloader, Scene &scene);
     ~TessellationUserInterface() override = default;
 
     void OnDefineUI(float timeStep) override;
@@ -21,6 +21,7 @@ public:
     void OnCursorMoveEvent(double xpos, double ypos) override;
 
 private:
+    ref::vulkan::ShaderReloader &m_ShaderReloader;
     Scene &m_Scene;
 };
 
@@ -39,6 +40,7 @@ public:
     void OnRender() override;
 
 private:
+    ref::vulkan::ShaderReloader m_ShaderReloader;
     ref::vulkan::Queue m_MainQueue;
 
     ref::vulkan::GraphicsPipelineInstanceId m_LinePipeline;

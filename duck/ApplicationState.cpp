@@ -22,12 +22,6 @@ void DuckUserInterface::OnDefineUI(float /* timeStep */)
 void DuckUserInterface::OnKeyEvent(Key key, KeyAction action, Mods mods)
 {
     m_Scene.OnKeyEvent(key, action, mods);
-
-    if (key == Key::H)
-    {
-        Application::GetInstance()->GetApplicationStateSpec().Queues.at(Application::MainQueueName).Handle.waitIdle();
-        ErrorApplicationState::ReloadShaders("Duck State");
-    }
 }
 
 void DuckUserInterface::OnMouseButtonEvent(ref::Button button, ref::ButtonAction action, ref::Mods mods)
@@ -408,12 +402,12 @@ void DuckApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     m_Renderer->UploadWithStaging(
         m_FrameGraph->GetImage("Duck Color Texture").front(), duckTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1), vk::Extent3D(duckTexture.Height, duckTexture.Width, 1)
     );
     for (int i = 0; i < 6; i++)
         m_Renderer->UploadWithStaging(
             m_FrameGraph->GetImage("Environment Cube Texture").front(), environmentTextures[i].Content, vk::ImageLayout::eShaderReadOnlyOptimal,
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, i, 1)
+            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, i, 1), vk::Extent3D(environmentTextures.front().Height, environmentTextures.front().Width, 1)
         );
 }
 

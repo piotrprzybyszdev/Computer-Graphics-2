@@ -642,11 +642,11 @@ void RobotApplicationState::OnEnter(vulkan::ApplicationState* /* previous */)
 
     m_Renderer->UploadWithStaging(
         m_FrameGraph->GetImage("Spark Texture").front(), sparkTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1), vk::Extent3D(sparkTexture.Width, sparkTexture.Height, 1)
     );
     m_Renderer->UploadWithStaging(
         m_FrameGraph->GetImage("Mirror Texture").front(), mirrorTexture.Content, vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
+        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1), vk::Extent3D(mirrorTexture.Width, mirrorTexture.Height, 1)
     );
 }
 

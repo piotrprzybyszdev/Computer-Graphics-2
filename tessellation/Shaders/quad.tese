@@ -1,6 +1,6 @@
 #version 460
 
-layout(set = 0, binding = 0) uniform CameraBuffer {
+layout (set = 0, binding = 0) uniform CameraBuffer {
     mat4x4 u_CameraProjection;
     mat4x4 u_CameraView;
     vec4 u_CameraOrigin;
@@ -11,12 +11,17 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     uvec2 pad0;
 };
 
-layout (quads, fractional_odd_spacing, cw) in;
+layout (set = 0, binding = 1) uniform sampler2D u_HeightTexture;
+
+layout (quads, equal_spacing, cw) in;
 
 layout (location = 0) in vec4 v_Position[];
 
 layout (location = 0) out vec4 o_Position;
 layout (location = 1) out vec4 o_Normal;
+layout (location = 2) out vec4 o_Tangent;
+layout (location = 3) out vec4 o_Bitangent;
+layout (location = 4) out vec2 o_TexCoords;
 
 vec3 evalBezierCurve(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t)
 {
@@ -40,6 +45,16 @@ vec3 computeTangent(vec3 pts[16], float t, float s)
     return evalBezierCurve(d0, d1, d2, d3, s);
 }
 
+float log10(float x)
+{
+    return log(x) / log(10.0f);
+}
+
+float factor(float dist)
+{
+    return -16.0f * log10(dist * 0.01f);
+}
+
 void main()
 {
     const vec3 p0 = evalBezierCurve(v_Position[0].xyz, v_Position[1].xyz, v_Position[2].xyz, v_Position[3].xyz, gl_TessCoord.x);
@@ -61,10 +76,19 @@ void main()
         v_Position[3].xyz, v_Position[7].xyz, v_Position[11].xyz, v_Position[15].xyz
     };
 
-    const vec3 tangent = computeTangent(ptsu, gl_TessCoord.x, gl_TessCoord.y);
-    const vec3 bitangent = computeTangent(ptsv, gl_TessCoord.y, gl_TessCoord.x);
-    
-    gl_Position = u_CameraProjection * u_CameraView * vec4(position, 1.0f);
-    o_Position = vec4(position, 1.0f);
-    o_Normal = vec4(normalize(cross(tangent, bitangent)), 0.0f);
+    const vec3 tangent = normalize(computeTangent(ptsu, gl_TessCoord.x, gl_TessCoord.y));
+    const vec3 bitangent = normalize(computeTangent(ptsv, gl_TessCoord.y, gl_TessCoord.x));
+    const vec3 normal = normalize(cross(tangent, bitangent));
+
+    const vec2 texCoords = (position.xz + 1.0f) / 2.0f;
+    const float mip = 6.0f - log2(factor(distance(u_CameraOrigin.xyz, position)));
+    const float height = textureLod(u_HeightTexture, texCoords, mip).r;
+    const vec3 mappedPosition = position + normal * height / 20.0f;
+
+    gl_Position = u_CameraProjection * u_CameraView * vec4(mappedPosition, 1.0f);
+    o_Position = vec4(mappedPosition, 1.0f);
+    o_Normal = vec4(normal, 0.0f);
+    o_Tangent = vec4(tangent, 0.0f);
+    o_Bitangent = vec4(bitangent, 0.0f);
+    o_TexCoords = texCoords;
 }
